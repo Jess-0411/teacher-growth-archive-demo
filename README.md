@@ -14,6 +14,8 @@
 
 发布目标仓库：`Jess-0411/teacher-growth-archive-demo`。
 
-预期发布地址（尚未验证）：https://jess-0411.github.io/teacher-growth-archive-demo/
+线上地址：https://jess-0411.github.io/teacher-growth-archive-demo/
+
+2026-11-14已验证外部访问返回HTTP 200，默认显示学生页面。
 
 将仓库 `main` 分支的根目录设置为 Pages 来源。此目录仅需 `index.html`、`.nojekyll` 和本说明，无需构建或安装依赖。
