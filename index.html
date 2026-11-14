@@ -1038,10 +1038,13 @@
   #ga-root .tg-feedback-head > small, #ga-root .tg-feedback-head > time { margin-left: 0; }
 }
 @media (max-width: 480px) {
-  #ga-root.tg-teacher-mode .ga-sidebar { flex: 0 0 154px; width: 154px; border-bottom: 0; }
-  #ga-root.tg-teacher-mode .ga-brand { flex: 0 0 154px; width: 154px; }
-  #ga-root.tg-teacher-mode .ga-nav-item { display: flex; width: 100%; justify-content: flex-start; }
-  #ga-root.tg-teacher-mode .ga-nav-sub { display: block; }
+  #ga-root.tg-teacher-mode .ga-body { display: block; }
+  #ga-root.tg-teacher-mode .ga-workspace { width: 100%; padding: 0; }
+  #ga-root.tg-teacher-mode .ga-sidebar { width: 100%; padding: 0; border-bottom: 1px solid var(--ga-line); }
+  #ga-root.tg-teacher-mode .ga-brand { flex: 1 1 auto; width: auto; }
+  #ga-root.tg-teacher-mode .ga-nav-item { display: none; }
+  #ga-root.tg-teacher-mode .ga-nav-item.ga-archive-nav { display: flex; flex: 1 1 0; min-width: 0; width: auto; justify-content: center; padding: 6px 4px; }
+  #ga-root.tg-teacher-mode .ga-nav-sub { display: none; }
   #ga-root.tg-teacher-mode .ga-tabs { padding-left: 0; padding-right: 0; }
   #ga-root.tg-teacher-mode .ga-filter { padding: 12px 8px; }
   #ga-root.tg-teacher-mode .ga-field { flex-wrap: wrap; gap: 3px; }
@@ -1050,6 +1053,7 @@
   #ga-root .tg-stats, #ga-root .tg-stats.five, #ga-root .tg-stats.tg-five { grid-template-columns: minmax(0, 1fr); gap: 13px; }
   #ga-root .tg-stat { border-right: 0; }
   #ga-root .tg-overview > .tg-chart { min-width: 0; }
+  #ga-root .tg-overview .tg-area-table, #ga-root .tg-two .tg-area-table { min-width: 480px; }
 }
 
 @media print {
@@ -1910,9 +1914,10 @@
   }
 
   function analyze(studentIds, term, options) {
-    const ids = validStudentIds(studentIds);
     const selectedTerm = term || demo.currentTerm;
     const resolved = resolveScope(options, selectedTerm), opts = resolved.scope;
+    const configured = resolved.valid && resolved.activity && resolved.activity.participantIds !== undefined ? new Set(resolved.activity.participantIds) : null;
+    const ids = validStudentIds(studentIds).filter(function (id) { return !configured || configured.has(id); });
     const selected = resolved.valid ? selectedDimensions(opts, selectedTerm) : [];
     const values = new Map();
     const dimensionResults = selected.map(function (item) {
@@ -2028,8 +2033,9 @@
 
   // 月度画像只反映本月已评价项；完整度另列，不能替代整期完整评价口径。
   function analyzeMonth(studentIds, term, options, month) {
-    const ids = validStudentIds(studentIds);
     const resolved = resolveScope(options, term);
+    const configured = resolved.valid && resolved.activity && resolved.activity.participantIds !== undefined ? new Set(resolved.activity.participantIds) : null;
+    const ids = validStudentIds(studentIds).filter(function (id) { return !configured || configured.has(id); });
     const opts = Object.assign({}, resolved.scope, { month: month });
     const selected = resolved.valid ? selectedDimensions(opts, term) : [];
     const byStudent = new Map();
@@ -2518,7 +2524,8 @@
   function metricHead(label,key,context) { return '<th class="ga-analysis-metric-head"><span>' + esc(label) + '</span>' + hint(key,context) + '</th>'; }
   function scopeTerm(scope, term) { return term || data().getActivity(scope && scope.activityId)?.term || demo().currentTerm; }
   function normalize(scope, term) {
-    const source = Object.assign({},scope || {},{role:normalizedRole(scope && scope.role)});
+    const source = scope == null || typeof scope === 'object' && !Array.isArray(scope)
+      ? Object.assign({},scope || {},{role:normalizedRole(scope && scope.role)}) : scope;
     return data().resolveScope(source,scopeTerm(source,term)).scope;
   }
   function systemFor(scope) { return data().systems.find(item => item.id === scope.systemId); }
@@ -2567,13 +2574,17 @@
     const dimensions = dimensionsFor(scope);
     const selectedDimension = dimensions.find(item => item.key === scope.dimensionKey);
     const dimensionItems = selectedDimension ? [selectedDimension] : dimensions;
+    const invalidOption = (value,label) => '<option value="' + esc(value) + '" selected>' + esc(label) + '</option>';
+    const invalidDimension = scope.dimensionKey !== 'all' && !selectedDimension ? invalidOption(scope.dimensionKey,'原一级指标已失效，请重新选择') : '';
+    const invalidIndicator = scope.indicatorKey !== 'all' && !dimensionItems.some(dimension => dimension.indicators.some(indicator => indicator.key === scope.indicatorKey)) ? invalidOption(scope.indicatorKey,'原二级指标已失效，请重新选择') : '';
+    const invalidRole = scope.role !== 'all' && !roles.includes(scope.role) ? invalidOption(scope.role,'原评价主体已失效，请重新选择') : '';
     const options = dimensionItems.map(dimension => '<optgroup label="' + esc(dimension.name) + '">' + dimension.indicators.map(indicator => '<option value="' + esc(indicator.key) + '" ' + (scope.indicatorKey === indicator.key ? 'selected' : '') + '>' + esc(indicator.name) + '</option>').join('') + '</optgroup>').join('');
     return '<div class="ga-analysis-controls ga-no-print">' +
       '<div class="ga-analysis-filters">' +
       (context === 'group' ? '' : '<label class="ga-field"><span>评价活动：</span><select aria-label="' + esc(context) + '评价活动" data-scope-field="activityId" data-context="' + esc(context) + '" ' + (activities.length ? '' : 'disabled') + '>' + (!activities.some(item => item.id === scope.activityId) ? '<option value="' + esc(scope.activityId || '') + '" selected>' + (activities.length ? '当前活动已失效，请重新选择' : '暂无评价活动') + '</option>' : '') + activities.map(item => '<option value="' + esc(item.id) + '" ' + (item.id === scope.activityId ? 'selected' : '') + '>' + esc(item.name) + '</option>').join('') + '</select></label>') +
-      '<label class="ga-field"><span>一级指标：</span><select aria-label="' + esc(context) + '一级指标" data-scope-field="dimensionKey" data-context="' + esc(context) + '" ' + (dimensions.length ? '' : 'disabled') + '><option value="all" ' + (scope.dimensionKey === 'all' ? 'selected' : '') + '>全部一级指标</option>' + dimensions.map(item => '<option value="' + esc(item.key) + '" ' + (item.key === scope.dimensionKey ? 'selected' : '') + '>' + esc(item.name) + '</option>').join('') + '</select></label>' +
-      '<label class="ga-field"><span>二级指标：</span><select aria-label="' + esc(context) + '二级指标" data-scope-field="indicatorKey" data-context="' + esc(context) + '" ' + (dimensionItems.length ? '' : 'disabled') + '><option value="all" ' + (scope.indicatorKey === 'all' ? 'selected' : '') + '>全部二级指标</option>' + options + '</select></label>' +
-      '<label class="ga-field"><span>评价主体：</span><select aria-label="' + esc(context) + '评价主体" data-scope-field="role" data-context="' + esc(context) + '"><option value="all" ' + (scope.role === 'all' ? 'selected' : '') + '>全部</option>' + roles.map(role => '<option value="' + esc(role) + '" ' + (role === scope.role ? 'selected' : '') + '>' + esc(role) + '</option>').join('') + '</select></label></div>' +
+      '<label class="ga-field"><span>一级指标：</span><select aria-label="' + esc(context) + '一级指标" data-scope-field="dimensionKey" data-context="' + esc(context) + '" ' + (dimensions.length ? '' : 'disabled') + '>' + invalidDimension + '<option value="all" ' + (scope.dimensionKey === 'all' ? 'selected' : '') + '>全部一级指标</option>' + dimensions.map(item => '<option value="' + esc(item.key) + '" ' + (item.key === scope.dimensionKey ? 'selected' : '') + '>' + esc(item.name) + '</option>').join('') + '</select></label>' +
+      '<label class="ga-field"><span>二级指标：</span><select aria-label="' + esc(context) + '二级指标" data-scope-field="indicatorKey" data-context="' + esc(context) + '" ' + (dimensionItems.length ? '' : 'disabled') + '>' + invalidIndicator + '<option value="all" ' + (scope.indicatorKey === 'all' ? 'selected' : '') + '>全部二级指标</option>' + options + '</select></label>' +
+      '<label class="ga-field"><span>评价主体：</span><select aria-label="' + esc(context) + '评价主体" data-scope-field="role" data-context="' + esc(context) + '">' + invalidRole + '<option value="all" ' + (scope.role === 'all' ? 'selected' : '') + '>全部</option>' + roles.map(role => '<option value="' + esc(role) + '" ' + (role === scope.role ? 'selected' : '') + '>' + esc(role) + '</option>').join('') + '</select></label></div>' +
       '</div>';
   }
 
@@ -2838,6 +2849,7 @@
     let ids = Array.from(new Set(array(opts.studentIds).filter(Boolean)));
     if (context === 'personal') ids = ids.slice(0,1);
     const analysis = service().analyze({studentIds:ids,term:opts.term,scope:opts.scope}) || {};
+    if (analysis.validScope === false) return '<section class="ga-support-area" data-support-context="' + esc(context) + '" aria-label="预警干预与教育决策建议">' + empty('当前评价范围已失效，请重新选择评价活动、一级指标或二级指标后查看预警与培养建议。') + '</section>';
     const allowed = new Set(ids);
     const alerts = array(analysis.alerts).filter(item => allowed.has(item.studentId));
     const anonymous = anonContexts.includes(context);
@@ -3020,18 +3032,18 @@
   function render({term,scope,compare='class'}){
     const ids=D.students.map(s=>s.id),base=D.stats(D.students,term),t=D.terms.find(t=>t.id===term);
     if(!t)return '<div class="ga-empty">学校报告学期已失效，请重新选择。</div>';
-    const all=F.getActivities(term).map(activity=>({activity,stat:F.analyze(ids,term,{systemId:activity.systemId,dimensionKey:'all',indicatorKey:'all',role:'all',activityId:activity.id})}));
+    const all=F.getActivities(term).map(activity=>({activity,stat:F.analyzeActivity(ids,term,activity.id)}));
     const classCount=new Set(D.students.map(s=>s.classId)).size,gradeCount=new Set(D.students.map(s=>s.grade)).size;
     const completeFields=['studentNo','name','classId','grade','sex','birthDate'];
     const fieldFull=D.students.filter(s=>completeFields.every(k=>s[k])).length;
-    const catalog=all.flatMap(({activity,stat})=>stat.dimensions.flatMap(dim=>dim.indicators.map(i=>[e(activity.name),e(dim.name),e(i.name),p(i.score),p(i.passRate),i.count+' / '+ids.length,ids.length-i.count,p(i.coverage)])));
+    const catalog=all.flatMap(({activity,stat})=>stat.dimensions.flatMap(dim=>dim.indicators.map(i=>[e(activity.name),e(dim.name),e(i.name),p(i.score),p(i.passRate),i.count+' / '+stat.expectedCount,stat.expectedCount-i.count,p(i.coverage)])));
     const firstLevelCount=all.reduce((sum,{stat})=>sum+stat.dimensions.length,0);
     const groups=compare==='grade'?[...new Set(D.students.map(s=>s.grade))].map(g=>({name:g,members:D.students.filter(s=>s.grade===g)})):D.classes.map(c=>({name:c.name,members:D.students.filter(s=>s.classId===c.id)}));
     const resolved=F.resolveScope(scope,term);
     const groupRows=groups.map(g=>{const memberIds=g.members.map(s=>s.id),a=F.analyze(memberIds,term,resolved.scope);return [e(g.name),g.members.length,a.count,p(a.coverage),p(a.score),p(a.passRate),a.recordCount];});
     return `<article class="ga-report ga-school-report" id="ga-school-report-preview"><div class="ga-report-head"><h2>学校整体学生成长分析报告</h2><p>${e(t.name)} · 全校范围 · 数据截至 ${e(t.end)} <span class="ga-demo">示例数据</span></p></div>
       ${section('一 学校学生基础概况',`<div class="ga-report-metrics ga-school-metrics"><div><span>学生总数</span><strong>${ids.length}</strong><small>人</small></div><div><span>年级数</span><strong>${gradeCount}</strong><small>个年级</small></div><div><span>班级数</span><strong>${classCount}</strong><small>个班级</small></div><div><span>评价覆盖率</span><strong>${p(base.coverage)}</strong><small>${base.evaluated}/${base.total}人</small></div></div><div class="ga-grid ga-school-base"><div><h4>班级分布</h4>${table(['班级','学生数','占比'],base.byClass.map(g=>[e(g.name),g.total,p(g.total/ids.length*100)]),'学校班级分布')}</div><div><h4>性别与年龄结构</h4>${table(['统计项','人数','占比'],[...base.sex.map(g=>[e(g.name),g.count,p(g.percentage)]),...base.ages.map(g=>[e(g.name),g.count,p(g.percentage)])],'学校性别与年龄结构')}</div></div>`)}
-      ${section('二 数据完整性与评价缺口',`<p>学生基础信息完整人数 ${fieldFull}/${ids.length}（${p(fieldFull/ids.length*100)}）；本期五育完整评价 ${base.evaluated} 人，尚无完整评价 ${base.total-base.evaluated} 人。无评价学生单列，不按零分或不达标计入。</p>${table(['评价活动','一级 / 二级指标数','有评价 / 应评价人数','覆盖率','缺少评价人数','有效评价记录'],all.map(({activity,stat})=>[e(activity.name),stat.dimensions.length+' / '+stat.dimensions.reduce((n,d)=>n+d.indicators.length,0),stat.count+' / '+ids.length,p(stat.coverage),ids.length-stat.count,stat.recordCount]),'学校评价数据完整性')}<p class="ga-note">覆盖率说明评价数据是否齐全；达标率说明有效评价结果。两项分别计算。当前展示配置目录与示例评分，目录齐全不代表每名学生均已评价。</p>`)}
+      ${section('二 数据完整性与评价缺口',`<p>学生基础信息完整人数 ${fieldFull}/${ids.length}（${p(fieldFull/ids.length*100)}）；本期五育完整评价 ${base.evaluated} 人，尚无完整评价 ${base.total-base.evaluated} 人。无评价学生单列，不按零分或不达标计入。</p>${table(['评价活动','一级 / 二级指标数','有评价 / 应评价人数','覆盖率','缺少评价人数','有效评价记录'],all.map(({activity,stat})=>[e(activity.name),stat.dimensions.length+' / '+stat.dimensions.reduce((n,d)=>n+d.indicators.length,0),stat.count+' / '+stat.expectedCount,p(stat.coverage),stat.missingCount,stat.recordCount]),'学校评价数据完整性')}<p class="ga-note">覆盖率说明评价数据是否齐全；达标率说明有效评价结果。两项分别计算。应评价人数按各活动参与名单确定；未配置名单时使用全校学生。当前展示配置目录与示例评分，目录齐全不代表每名学生均已评价。</p>`)}
       ${section('三 全校综合评价发展概况',global.GrowthSchoolOverviewUI.render({term}),'ga-school-overview-section')}
       ${section('四 评价活动与指标深入分析',global.GrowthAnalysisUI.render({studentIds:ids,term,scope:resolved.scope,context:'school'}))}
       ${section('五 年级与班级横向对比',`<div class="ga-school-compare ga-no-print"><label>对比范围：<select id="ga-school-compare" aria-label="学校报告对比范围"><option value="class" ${compare==='class'?'selected':''}>班级对比</option><option value="grade" ${compare==='grade'?'selected':''}>年级对比</option></select></label></div><p class="ga-note">对比各班级或年级的评价得分率均值、达标率和有效人数，采用相同学期、评价活动、一级指标、二级指标和评价主体。</p>${resolved.valid?table([compare==='class'?'班级':'年级','学生数','有评价人数','覆盖率','得分率','达标率','评价次数'],groupRows,'学校横向对比'):'<div class="ga-empty">当前评价范围已失效，请重新选择后查看横向对比。</div>'}`)}
@@ -3073,130 +3085,131 @@
 
 (function (global) {
   'use strict';
-  const chapterTitles = ['1. 背景与目标','2. 用户与使用场景','3. 需求范围','4. 功能需求列表','5. 核心流程与交互说明','6. 异常场景与边界条件','7. 数据口径与埋点需求','8. 风险、依赖与限制','9. 验收标准'];
-  const p = text => '<p>' + text + '</p>';
-  const ul = items => '<ul>' + items.map(item => '<li>' + item + '</li>').join('') + '</ul>';
-  const ol = items => '<ol>' + items.map(item => '<li>' + item + '</li>').join('') + '</ol>';
-  const scope = (inside, outside) => '<h4>In Scope</h4>' + ul(inside) + '<h4>Out of Scope</h4>' + ul(outside);
-  const table = rows => '<div class="ga-prd-table-wrap"><table class="ga-prd-table"><thead><tr>' + ['功能模块','功能点','需求描述','优先级（P0 / P1 / P2）','备注说明'].map(text => '<th>' + text + '</th>').join('') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + row.map(text => '<td>' + text + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
-  const page = (title, bodies) => ({title, sections:chapterTitles.map((title, index) => ({title, html:bodies[index]}))});
-  const scoreRule = '记录得分率=原始得分÷配置满分×100；满分须大于0，原始分须位于0至满分之间。细项对范围内有效记录取均值，维度对所需细项等权，体系对所需维度等权。整期综合缺少必需项时保留空值，已有细项仍展示；不得补0或跨体系累计。';
-  const passRule = '达标判断使用未取整的当前范围归一化得分率，≥60%为达标，<60%为未达标；展示保留一位小数。五维完整只控制五育综合能否计算，不能把五维全部达标作为综合达标条件。';
-  const localLimit = '当前为本地合成示例，目录、评分、建议和下载在浏览器中处理。未接入真实后端、登录权限、评价提交或AI生成服务；【假设】正式接入由服务端校验学校、班级、学生及记录访问范围。';
-  const modalCheck = '点击本页PRD按钮仅打开本页九章说明，关闭后学生、学期、角色、范围、页码与选择保持；PRD按钮及弹窗不进入业务打印或报告导出。';
-  global.GrowthPagePRD = global.GrowthPagePRD || {version:'V1.0', updatedAt:'2026-11-14', pages:{}};
-  Object.assign(global.GrowthPagePRD.pages, {
-    'students-list': page('学生成长档案 · 学生名单页PRD', [
-      p('本页承担学生成长档案的检索、身份定位与入口分发。依据学期内五育结果展示评价得分率和达标状态，通过明确行操作进入个人档案或报告，并支持按名单范围导出。名单不承载个人报告生成任务。'),
-      ul(['学校管理者按学期、年级和班级定位学生，核对本期评价次数、五育结果及缺数状态。','班主任通过学生姓名或学号查询，进入指定学生档案或直接查看报告；身份关联使用学生ID。','【假设】原型操作人为学校管理者或获授权教师，学生及家长通过个人报告阅读视图查看内容，列表不模拟真实身份授权。']),
-      scope(['学期、年级、班级、学生姓名或学号查询；名单行展示、10/20条分页与跳页。','本页选择、跨页保留选择、CSV导出；个人档案、个人报告、统计分析和学校报告入口。','当前名单页专属PRD及页面上下文展示。'],['个人报告生成、批量生成、后台任务进度、评价写入与档案维护。','名单评价活动筛选、评价覆盖列、姓名点击跳转；教师个人成长评价业务。']),
+  const titles=['1. 背景与目标','2. 用户与使用场景','3. 需求范围','4. 功能需求列表','5. 核心流程与交互说明','6. 异常场景与边界条件','7. 数据口径与埋点需求','8. 风险、依赖与限制','9. 验收标准'];
+  const p=s=>'<p>'+s+'</p>',ul=a=>'<ul>'+a.map(s=>'<li>'+s+'</li>').join('')+'</ul>',ol=a=>'<ol>'+a.map(s=>'<li>'+s+'</li>').join('')+'</ol>';
+  const scope=(a,b)=>'<h4>In Scope</h4>'+ul(a)+'<h4>Out of Scope</h4>'+ul(b);
+  const table=rows=>'<div class="ga-prd-table-wrap"><table class="ga-prd-table"><thead><tr>'+['功能模块','功能点','需求描述','优先级（P0 / P1 / P2）','备注说明'].map(s=>'<th>'+s+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(s=>'<td>'+s+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+  const page=(title,bodies)=>({title,sections:titles.map((title,i)=>({title,html:bodies[i]}))});
+  const hierarchy='业务层级统一为评价活动→一级指标→二级指标。默认每学期4项活动、15个一级指标、35个二级指标，数量随目录变化。活动firstLevelKeys关联多个一级指标；dimensionKey/indicatorKey分别为一级/二级指标兼容键，systemId仅为内部评分模板映射，不作为独立筛选入口。';
+  const scoring='记录归一得分率=score÷maxScore×100；maxScore>0且0≤score≤maxScore。同一学生二级指标对有效记录等权平均，一级指标对所需二级指标等权，活动对所需一级指标等权。整期缺少所需指标则该级综合为空，已有指标仍显示；缺失不补零，各活动独立，不生成跨活动总分。使用未取整个人结果≥60%判定达标，显示一位小数；59.96%显示60.0%时仍未达标。';
+  const migration='GrowthDetail.resolveScope(scope,term)迁移旧活动ID和范围，保留旧一级、二级选择；旧活动隐含一级且原选择为全部时补回原一级。未知活动、跨期活动、父子冲突或失效指标明确提示，不改用其他活动生成结论。显式participantIds按输入学生与名单交集统计，空名单为0人，未配置名单保留输入人群。';
+  const comparison='“较上一期”仍表示上一学期。GrowthDetail.previousScope核验两期唯一comparisonKey、内部模板及所选指标归属；全活动比较还要求一级指标集合一致。无唯一匹配或无有效值显示—，不按名称、位置或同活动ID跨期替代；两期各自计算完整样本。';
+  const local='当前人员、目录、评分、曲线、评语、勋章与建议均为本地合成演示，未接入真实后端、AI、登录权限或执行通知。【假设】正式接口按学校与人员授权并由服务端复验范围、记录状态和版本。';
+  const modal='右上角PRD按钮打开当前页专属九章只读弹窗，显示当前上下文；关闭后人员、学期、角色、筛选、页码与范围不变。支持键盘关闭及焦点返回；PRD按钮、弹窗及内容不进入业务导出或打印。';
+  const telemetry=(events,fields)=>p('【假设】正式埋点：'+events+'；参数含page_id、is_demo、'+fields+'。使用稳定ID/脱敏标识，不采集姓名、学号、评语和关键词原文；当前无上报。');
+  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.0',updatedAt:'2026-11-14',pages:{}};
+  global.GrowthPagePRD.version='V2.0';
+  Object.assign(global.GrowthPagePRD.pages,{
+    'students-list':page('学生成长档案 · 学生名单页PRD',[
+      p('按学期、组织与身份检索定位学生，展示五育评价得分率、达标情况及评价次数，通过明确行操作进入档案或直接查看报告。名单固定使用五育评价，不生成跨活动综合分。'),
+      ul(['管理者核对年级、班级学生评价结果与完整性。','教师按姓名或学号定位学生，进入档案、统计或学校报告。','【假设】当前为管理端演示，正式展示授权学校及学生。']),
+      scope(['条件查询、10/20条分页、跳页、跨页选择、CSV导出。','个人档案、直接查看报告、统计分析、独立学校报告及本页PRD。'],['名单活动筛选、姓名点击、评价覆盖列、个人报告生成任务。','评价写入、档案维护、真实权限与跨活动总分。']),
       table([
-        ['查询条件','默认值与查询','默认学期2026-2027-1，年级与班级全部，keyword为空，activityId=all；输入不即时查询，点击查询或提交表单后应用。','P0','姓名或学号去首尾空格后包含匹配；学期按新到旧排列。'],
-        ['查询条件','联动与重置','更换年级后班级选项仅含该年级并清空原班级；查询回第1页并清空选择；重置恢复默认学期和全部组织、空关键词。','P0','名单始终按整学期全部活动汇总。'],
-        ['名单','字段与身份','展示选择框、序号、姓名、学号、性别、年级、班级、评价得分率、达标情况、评价次数、更新时间和操作。','P0','姓名为纯文本；无评价覆盖或生成状态列。'],
-        ['名单','分页','默认10条/页，可切换20条/页；支持上一页、下一页、页码和数字跳页，切换条数回第1页，跳页限制在有效范围。','P0','序号按当前筛选全集连续计算；0条时保留第1页结构。'],
-        ['名单','行操作与返回','查看档案进入该学生成长概览；查看报告直接进入个人报告；从个人档案返回保留已应用列表条件和页码。','P0','新档案重置个人分析为五育整体、评价明细为全部体系与维度第1页。'],
-        ['选择导出','选择和CSV','完整五育学生可勾选；全选仅选择当前页可选行，跨页保留选择；有选择则导出选中学生，无选择则导出当前筛选全集。','P1','不完整学生禁选；无选择导出仍保留筛选内缺数学生及空值。'],
-        ['导航','统计及学校入口','统计分析进入群体分析；查看学校报告进入独立全校报告并采用列表已应用学期，不继承姓名、班级限制。','P0','学校报告使用独立schoolTerm及scope。'],
-        ['页内说明','当前页PRD','按钮打开名单页九章PRD，上下文展示当前已应用学期及名单范围；开关不触发查询或导出。','P0','不将未提交表单值当作已应用筛选。']
+        ['查询','默认及联动','默认当前学期、全部年级班级、空关键词；提交才应用条件并回第1页清选择；年级变化清班级并更新候选；重置恢复默认。','P0','姓名/学号去首尾空格后包含匹配。'],
+        ['名单','字段和操作','展示身份组织、评价得分率、达标情况、评价次数、更新时间和查看档案/查看报告；姓名为纯文本。','P0','无评价覆盖、生成状态或姓名链接。'],
+        ['名单','分页','默认10条，可切20条；数字页码和跳页限制在有效范围，切条数回第1页。','P0','序号按筛选全集连续。'],
+        ['名单','五育口径','完整五育五个一级指标等权平均；评价次数取本人当期全部原始记录数。','P0','其余活动不累计进五育。'],
+        ['CSV','选中优先','仅完整五育行可选；全选当前页可选行，跨页保留；有选择导出选中，否则导出筛选全集含缺数学生。','P1','UTF-8 BOM、引号和公式前缀转义。'],
+        ['导航','范围隔离','按studentId进入个人档案，个人默认五育评价全指标；返回保留名单条件页码；学校入口只继承学期。','P0','学校不受姓名班级限制。'],
+        ['页内PRD','当前页说明',modal,'P0','只展示已应用查询条件。']
       ]),
-      ol(['打开学生成长档案默认进入名单。调整查询条件，年级变化同步更新班级候选；查询后按新条件重算列表并清空选择、回第1页。','点击查看档案时保存当前列表状态，以稳定studentId进入成长概览；点击查看报告直接展示当前学生报告，不弹生成窗口。','需要导出时先确定选择范围；无勾选导出筛选全集，有勾选导出当前筛选结果中的选中学生，范围跨页。','点击查看学校报告进入独立全校视图；从个人档案点击返回列表恢复已应用条件和页码。']),
-      ul(['筛选无结果：显示暂无符合筛选条件的学生档案，导出禁用，不沿用上次列表。','五育任一维度缺数：评价得分率为—、状态为暂无评价、选择框禁用，但查看档案与查看报告仍可用。','查询或重置清除旧勾选；换页不清除。全选不应将无完整五育结果学生加入选择。','跳页输入空值、非有效数字或越界值时归入有效页码；首尾翻页按钮禁用。','更新时间缺失显示—；无记录评价次数为0；缺少学号或性别时按现有字段兼容读取，不编造身份。']),
-      p('取数入口为GrowthDemo.filterStudents(filters)与GrowthDetail.getRecords({studentId,term})。五育综合为同学期德智体美劳五维完整分数的算术平均；评价次数按统一明细记录数计算，不使用旧汇总字段。') + p(passRule) + p('CSV包含示例标识、学期、身份组织、五维得分、评价得分率、达标维度数与评价次数；UTF-8 BOM，所有单元格引号转义，=、+、@、-前缀作安全转义，文件名含学期及北京时间日期。') + p('【假设】正式埋点growth_list_view、growth_list_query、growth_student_open、growth_list_export，参数含page_id、term_id、grade、class_token、has_keyword、page_no、page_size、selected_count及export_count；不采集姓名、学号或查询文本。当前原型不宣称埋点已上报。'),
-      p(localLimit) + ul(['五育综合与明细必须同源同步；不得以观察到的最高分替代量表满分。','列表只显示五育综合，不将四体系累计为全局得分。评价次数反映记录量，不代表评价质量。','本地下载依赖浏览器下载能力；setWidgetState在宿主提供时用于本地界面状态恢复，不等于服务端持久化。']),
-      ol(['默认条件为2026-2027-1、全部年级班级、空关键词，名单不显示活动筛选、评价覆盖或生成状态；姓名为纯文本。','查询与重置符合联动规则，10/20条、跨页选择与有效跳页均可复验；空列表禁用导出。','选定学生的姓名、学号、班级、明细和报告均按同一ID关联，返回保留列表已应用条件及页码。','按五维平均复算得分率与≥60%达标；不完整五育显示空值，不能把缺数作0分或把五维全达标作综合条件。','CSV选中优先、无选择导出全集，跨页人数一致，中文、引号、换行和公式前缀转义正确。',modalCheck])
+      ol(['提交查询，应用过滤并回第1页清空选择。','查看档案以studentId进入概览；查看报告直接展示；初始个人范围为五育评价全部一级、二级指标。','导出有选择则优先选中范围，无选择导出筛选全集。','学校入口建立独立学校范围；个人返回恢复名单状态。']),
+      ul(['无命中显示空态并禁用导出。','五育缺数显示—和暂无评价、禁选，仍可查看已有档案事实。','有效0分保留，无记录次数0；首尾翻页禁用。','新查询和重置清选择，换页保留；同名学生按ID区分。']),
+      p(hierarchy)+p(scoring)+p('取GrowthDemo.filterStudents(filters)，五育结果与GrowthDetail同源，评价次数取getRecords({studentId,term})。CSV含身份、五育一级指标得分、评价得分率、达标一级指标数、记录数及示例标识。')+telemetry('growth_list_view/query、growth_student_open、growth_list_export','term_id、grade_id、class_id、has_keyword、page_no、page_size、selected_count、export_count'),
+      p(local)+p('本地恢复不等于服务端持久化。五育完整样本的勾选限制不能作为其他活动完整性的判断。CSV数值均为示例量表结果。'),
+      ol(['查询、联动、重置、10/20条分页、跳页和跨页选择正确。','姓名不可点击，无评价覆盖列；五育均值与未取整60%边界正确。','选中优先及缺数CSV范围准确、转义正确，缺数不补0。','入口ID关联一致，返回保留状态，学校不继承个人限制。',modal])
     ]),
-    'student-overview': page('学生成长档案 · 成长概览页PRD', [
-      p('本页以单个学生和已应用学期为范围，将五育画像、优势与提升方向、个人活动月度追踪、成长激励和最近评价记录集中展示，支持从总览进入分析、明细及报告。五育数值卡片保持静态，个人追踪采用独立的已参与类型与活动选择。'),
-      ul(['班主任先核对学生身份和五育完整性，再通过优势及最低维度识别需关注方向，并追溯最近评价。','学校管理者在授权学生范围内查看个人在具体活动中的月度记录与班级、年级参考。','【假设】学生及家长使用报告阅读视图；本页为后台示例，不模拟真实登录权限。']),
-      scope(['学生身份、五育雷达、优势与提升、静态五维值、已参与活动追踪、勋章、最近5条记录。','成长概览、多维分析、评价明细、查看报告四子页签；报告、培养方案及返回操作。','已参与活动的目录来源、名单判定、二级联动及无评价空态。'],['五育数值块点击下钻、活动报名、评价录入、勋章发放或分数修改。','把追踪选择写入个人多维、报告或培养方案scope；真实干预任务及AI诊断。']),
+    'student-overview':page('学生成长档案 · 成长概览页PRD',[
+      p('展示学生五育画像、优势与提升、个人成长追踪、勋章及最近记录。固定五育概览与独立追踪选择分别保存；追踪直接选择当前学生参加的评价活动及两级指标。'),
+      ul(['教师核对身份、五育优势与需要支持的方向。','按该生参与活动及所属一级、二级指标查看月度发展与组织参考。','学生、家长通过报告阅读版本查看对应指导。']),
+      scope(['身份头部、五育雷达、静态得分、优势提升、追踪、勋章、最近5条记录。','评价活动→一级指标→二级指标三级追踪、四子页签、报告/方案/输出及本页PRD。'],['五育分值卡点击下钻、活动报名、勋章发放、记录编辑。','追踪选择覆盖个人分析范围；真实干预执行。']),
       table([
-        ['档案头部','身份与操作','持续展示姓名、学号、性别、班级、学期、五育综合及达标状态；提供返回列表、查看报告、查看培养方案、导出报告和打印。','P0','培养方案取personal范围；当前范围无记录时禁用，报告导出打印要求完整五育。'],
-        ['五育画像','雷达及入口','按当前学期展示五育画像及对照；查看全部维度进入个人多维分析五育整体。','P0','五育得分块只展示值，不显示查看指标分析或响应点击。'],
-        ['优势方向','并列与达标','最高和最低维度全部并列展示；最低值≥60%标为相对提升方向，低于60%标为待提升；五维同分展示均衡。','P0','缺少完整五育时显示补齐记录说明，不输出优势结论。'],
-        ['个人成长追踪','候选活动','按学生ID、学期从独立类型及活动目录读取候选；活动显式配置participantIds时只按包含本人判定，未配置时按本人当期存在该活动记录判定。','P0','[]表示无人参与；名单排除本人时不能由记录反向加入。'],
-        ['个人成长追踪','二级选择','选择器顺序为评价类型、评价活动，无全部项；默认首个可选类型及其首活动，类型变化后活动回到该类型首项。','P0','类型仅保留至少一个可选活动的类型；名称和排序取目录。'],
-        ['个人成长追踪','活动曲线','选定活动的systemId、dimensionKey、activityId驱动个人、班级、年级月度曲线，indicatorKey=all、role=all。','P0','保留活动日期、年月轴、图例、有效点、空月断点；无三段月度说明及数据截至同量表尾段。'],
-        ['激励与记录','勋章及证据','勋章展示名称、维度、授予日期且不重复计分；最近评价展示统一记录前5条，查看全部进入明细。','P0','空勋章及空记录分别显示空态；最近记录沿用当前明细体系/维度状态。'],
-        ['页内说明','概览PRD','显示本学生、学期及当前个人追踪类型活动上下文；PRD内容解释五育静态值与追踪范围的区别。','P0','打开关闭不改变追踪或其他分析范围。']
+        ['身份','四子页签','显示身份、学期、五育结果；页签为成长概览、多维分析、评价明细、查看报告。','P0','返回恢复名单。'],
+        ['五育画像','静态得分及优势','雷达和五项数值保留；分值块无按钮；最高最低并列保留，最低≥60%为相对提升，<60%为待提升，同分为均衡。','P0','不完整时不输出完整五育优势。'],
+        ['个人成长追踪','参与与默认','显式participantIds以名单为准，未配置则本人本期有该活动记录才列入；默认首个候选活动、全部一级与二级指标。','P0','空名单无人；无类型选择。'],
+        ['个人成长追踪','三级联动','活动切换重置一级、二级；一级切换重置二级；候选按活动firstLevelKeys和指标归属；选择二级须对应一级。','P0','personalTracking独立保存。'],
+        ['个人成长追踪','月曲线','按当前追踪范围画个人、班级、年级月曲线；保留活动日期、月份、图例、值提示和无记录断点。','P0','删除指定三段月度说明及数据截至同量表尾段。'],
+        ['激励与证据','勋章及近期记录','勋章保留既有信息不计分；最近5条原始记录按活动、一级、二级归属展示。','P1','更多进入明细。'],
+        ['报告与方案','范围继承','查看报告复制personal范围，培养方案继承personal而非追踪范围；当前培养范围无记录禁用；完整五育可输出报告。','P0','追踪不覆盖其他scope。'],
+        ['页内PRD','当前上下文',modal,'P0','学生、学期、追踪活动与指标。']
       ]),
-      ol(['从列表查看档案，以studentId进入成长概览；保留列表条件及页码，个人分析回到五育整体，明细回到全部体系维度第1页。','读取当前学生同学期五育结果，计算完整性、整体达标、并列优势及相对提升；数值卡片不绑定操作。','解析personalTracking：若学生或学期不匹配、类型或活动失效，回到首个有效类型和活动；没有候选时清空选择。','选择评价类型后重新计算其活动，默认首项；选择活动后只更新个人追踪并重画月曲线，不修改五育值及personal/report scopes。','点击查看全部维度进入多维分析；最近记录查看全部进入明细；查看报告使用同一学生和学期；返回列表恢复已应用列表状态。']),
-      ul(['当前学生或学期无已参与活动：两个选择器禁用并展示无已参加活动说明，不回退其他学生或学期。','名单包含本人但该活动无有效评价：活动仍可选，展示活动日期及暂无有效评价提示；不能隐藏已配置的参与活动。','活动未配置名单且本人无当期记录：不列入候选；存在记录只用于参与判定，不从记录反推目录名称或排序。','五维同分时为均衡；全部维度均已达标时相对最低不称未达标；无完整五育不输出排序结论。','月度无记录保持空点、断线；无勋章不填造，勋章不提高分数。当前学生失效则安全返回名单。']),
-      p('五育使用GrowthDemo中经统一明细同步的学期结果；活动选择由GrowthPersonalTracking.resolve(studentId,term,selection)解析，曲线调用GrowthAnalysisUI.renderTrend，记录调用GrowthDetail.getRecords。') + p(scoreRule) + p(passRule) + p('月度曲线对当月已有细项均值再按已有维度等权，群体以当月有值学生等权；缺少项不补0。该月度观测口径与整期完整评价口径分开。personalTracking独立保存studentId、term、typeId、activityId。') + p('【假设】growth_profile_view、growth_personal_track_change、growth_detail_tab_change记录student_token、term_id、type_id、activity_id、tab_id和has_data；PRD开关单独记录page_id，不包含评语及报告正文。'),
-      p(localLimit) + ul(['个人追踪名单判定与学校活动应评名单缺省规则用途不同；本页名单缺省采用本人已有记录，不能默认全校参加。','班级、年级为当前示例组织；跨期比较需有组织快照和兼容量表，名称相同不构成可比依据。','五育总览、独立追踪和多维范围并列存在，开发不得为简化状态而共用同一隐藏筛选。']),
-      ol(['学生头部、五育画像、优势、活动、勋章与记录均属于当前学生及学期；返回列表保留筛选页码。','五维值在桌面紧凑五列静态展示、窄屏可换行，无按钮语义、查看指标分析或点击跳转。','名单含本人、名单排除本人、显式空名单、名单缺省有记录和无记录五类参与条件均按规则筛选；类型名称与活动顺序来自目录。','无全部选项；默认首个有效类型活动；类型切换后活动联动，失效选择复位；无候选禁用。','选择具体活动后曲线使用其ID及体系维度，个人/班级/年级图例、活动日期、跨年月轴及空月断点保留，其他scope和五育值不变。','并列优势、均衡、≥60%相对提升、缺数与无勋章空态可复验。',modalCheck])
+      ol(['按学生ID与学期加载固定五育事实。','GrowthPersonalTracking.resolve解析参与目录及独立追踪范围，默认全部指标。','活动或一级变化清下级并更新月曲线，不改personal/report范围。','报告及方案采用各自范围；返回保留名单。']),
+      ul(['无参与活动展示空态，不用其他学生活动替代。','名单排除本人时已有记录不反向加入；未配置名单且无记录不加入。','保存活动失效或不再参与显示失效，不能自动换首项输出结论；首次无选择才取默认。','旧选择可迁移则保留两级；冲突保持失效。','部分评价仅展示已有事实；无记录月断开。']),
+      p(hierarchy)+p(scoring)+p(migration)+p('personalTracking与personal/report/group/school相互隔离。月度只按该月已有二级、已有一级依次等权，再汇总有效学生均值；不累计、不复制整期分。班级、年级参考取本人所属组织全集并套相同活动与指标。')+telemetry('student_overview_view、personal_tracking_change、student_tab_change、support_plan_open','student_token、term_id、activity_id、dimension_key、indicator_key、valid_scope、entry_point'),
+      p(local)+p('月度观测与整期完整结果使用不同覆盖口径。参与判定仅为目录候选和分析范围，不提供报名或活动维护能力。'),
+      ol(['五育值无点击按钮，优势、并列、均衡、相对提升及缺数正确。','验证名单、空名单、排除、无记录及未配置名单参与规则。','三级联动与全指标默认正确，追踪不覆盖分析报告方案范围。','旧状态不丢指标，失效不替换；月曲线点值、日期和断点正确。','页面及输出不出现指定删除段落。',modal])
     ]),
-    'student-records': page('学生成长档案 · 评价明细页PRD', [
-      p('本页提供学生评价事实的只读追溯，按体系和维度检索记录，展示原始得分、配置满分、评价内容、主体与来源活动。明细与名单评价次数及多维分析使用同一记录集合，支持结果核验。'),
-      ul(['班主任从个人档案进入评价明细，核对某体系、某维度的记录与分析结果。','学校管理者核查活动来源、评价时间与原始量表，区分无评价和0分。','【假设】当前是授权后台只读示例，明细不提供学生或评价人的真实隐私授权服务。']),
-      scope(['当前学生、已应用学期内记录；全部体系或指定体系、全部维度或指定维度筛选。','评价时间、体系、维度、指标及评价内容、得分/满分、评价角色和来源活动七列。','日期倒序与稳定ID次序、固定20条分页、无记录空态、四子页签及返回。'],['新增、编辑、删除、撤回记录；在本页发放积分、导入评价或下载证据附件。','独立明细CSV导出、细项及角色筛选器；将其他分析scope隐式写入明细筛选。']),
+    'student-records':page('学生成长档案 · 评价明细页PRD',[
+      p('以评价活动、一级指标、二级指标筛选当前学生原始事实，展示日期、分值、主体及评语，用于核对分析来源，不再次计算跨记录综合结果。'),
+      ul(['教师从分析追溯到具体记录与原始分/满分。','研发按稳定ID验证活动归并不丢失或重复事实。','【假设】正式记录由服务端授权，本页只读。']),
+      scope(['全部或单活动、一级、二级筛选、原始记录、每页20条分页。','稳定排序、空态、四子页签、头部导航及本页PRD。'],['主体筛选、写入编辑删除、附件上传、明细专属导出打印。','将头部报告输出称为明细导出。']),
       table([
-        ['范围','默认与隔离','新进入档案时recordSystem=all、recordDimension为空、recordPage=1；当前学生及filters.term固定，不继承多维或报告主体筛选。','P0','在四个子页签之间切换保留现有明细筛选。'],
-        ['筛选','体系','可选全部评价体系及目录四体系；切换体系立即刷新，清空维度并回第1页。','P0','维度候选按体系联动；全部体系列出全部维度。'],
-        ['筛选','维度','可选全部维度及当前候选维度；切换立即刷新并回第1页。','P0','不额外提供指标、活动或评价主体选择器。'],
-        ['记录','七列展示','展示评价时间、评价体系、评价维度、具体指标与评价内容、得分/满分、评价角色、来源活动；内容保留可读换行。','P0','得分展示原始分与配置满分，不以百分比替代证据。'],
-        ['记录','排序与分页','取数按日期倒序、同日按记录ID稳定升序；每页固定20条，显示总数及当前/总页，提供上一页和下一页。','P0','首尾按钮禁用；无记录不显示分页。'],
-        ['导航','档案通用操作','保留身份头部和四子页签；返回列表保留原筛选页码；头部导出报告或打印指向学生报告，不导出本表。','P0','打印动作切到查看报告；报告需完整五育。'],
-        ['页内说明','明细PRD','展示当前学生、学期、明细体系与维度上下文，说明固定20条和原始分展示口径。','P0','PRD开关不翻页、不清空筛选。']
+        ['筛选','初始与隔离','新入档案recordActivity=all、recordDimension为空、recordIndicator=all、recordPage=1，不继承分析主体。','P0','全部活动仅浏览事实。'],
+        ['筛选','三级联动','活动变化清一级二级，一级变化清二级，二级定位所属一级；每次回第1页，候选按配置归属。','P0','无重复内部模板入口。'],
+        ['表格','原始事实','展示日期、评价活动、一级指标、二级指标、原始分/满分、原始主体、评价内容。','P0','同名指标以稳定键区分。'],
+        ['分页','排序与切片','日期倒序，同日ID升序，固定20条；过滤后更新条数页数，切页仅改recordPage。','P0','保持学生和学期。'],
+        ['呈现','安全与0分','评价内容转义为文本并自然换行；有效0分显示0/满分，缺失—。','P0','不按同内容或分值去重。'],
+        ['导航','状态保留','页签往返保留明细条件，换学期清活动及两级；头部输出仍是报告。','P0','不宣称明细输出。'],
+        ['页内PRD','记录上下文',modal,'P0','显示三级选择和页码。']
       ]),
-      ol(['从个人档案切换评价明细，读取当前studentId、term、recordSystem和recordDimension；调用统一getRecords获得全集。','选择体系后清空维度并回第1页；选择维度后保持体系并回第1页；据筛选结果重算总页。','按日期倒序、同日ID升序切片，每页20条；翻页只改变recordPage，不更改学生学期或其他分析scope。','通过四子页签切换到概览、分析、报告；头部查看报告直接进入报告，返回列表恢复原已应用条件和页码。']),
-      ul(['无匹配记录展示该范围暂无评价记录，保留体系与维度选择器，不沿用旧表。','有效0分应展示0/满分，不能显示—或被当作无记录；分析中的无效量表分不进入归一化结果。','评价内容含引号、尖括号等字符时作文本转义，不作为HTML执行；长评语自然换行。','体系切换时旧维度即使同名也须清空；同名学生不能混用记录。','当前学生失效时返回名单；缺少真实附件不展示可下载按钮。']),
-      p('唯一取数入口为GrowthDetail.getRecords({studentId,term,systemId:recordSystem,dimensionKey:recordDimension||all})，总条数取筛选后记录集合长度；分页切片为[(recordPage−1)×20,recordPage×20)。当前表展示各原始评价角色，分析中家长/学生聚合不改写原始来源。') + p(scoreRule) + p('原始记录的score/maxScore与归一化百分比含义不同；本页不再次聚合得分。记录以稳定ID关联，不能按评语、日期或相同分值错误去重。') + p('【假设】growth_records_view、growth_records_filter、growth_records_page记录student_token、term_id、system_id、dimension_key、page_no、page_size=20及record_count；不记录评语、原始评价人身份或附件内容。'),
-      p(localLimit) + ul(['原型记录均为合成事实；正式接入须补齐有效状态、撤销、修订历史及记录ID契约。','同一事实若有多次评价应由业务规则确认，前端不得因内容相同自行删除。','本页不证明已具备真实量表换算、附件服务、权限过滤或审计记录。']),
-      ol(['新进入档案后明细为全部体系、全部维度、第1页；体系和维度切换均回第1页，体系变化清空维度。','七列表头完整，记录按日期倒序及同日ID稳定排序；明细总数与同范围统一记录入口一致。','21条结果时第一页20条、第二页1条，首尾翻页禁用；无记录保留空态且无分页。','0分保留，原始分/满分与分析归一化可追溯；长评语和特殊字符不破坏表格或执行脚本。','切回其他子页签再返回时明细条件保留；返回列表保留原筛选页码，头部打印及导出不冒充明细导出。',modalCheck])
+      ol(['读取学生学期及独立明细筛选，调用getRecords。','筛选联动清下级、回第1页，排序后分页。','切页不改其他范围；进入报告或返回按既有导航保留名单状态。']),
+      ul(['无匹配显示空态，不保留旧表。','未知活动或父子冲突不扩大记录范围；旧活动解析时保留原一级含义。','21条分20+1，首尾按钮禁用；长评语与特殊字符安全。','归并只改activityId/activityName，ID、学生、日期、主体、分、满分、内容不变。']),
+      p(hierarchy)+p(migration)+p('唯一入口getRecords({studentId,term,activityId,dimensionKey,indicatorKey})；分页[(page−1)×20,page×20)。原始教师、家长、学生自评、同伴来源不因分析的家长/学生聚合改写；本页不再次归一聚合。原始记录可供事实核对，活动分析仍遵守参与名单。')+telemetry('growth_records_view/filter/page','student_token、term_id、activity_id、dimension_key、indicator_key、page_no、page_size=20、record_count'),
+      p(local)+p('正式接入需规定有效、撤销、修订和审计；前端不能因评语相同自行去重。记录数不等于完整评价人数。'),
+      ol(['初始全部活动与全部两级，三级联动及回第1页正确。','数量、日期倒序、ID稳定排序和20条分页与入口一致。','有效0分、文本转义和长内容可读；无越权编辑操作。','迁移前后事实保持，无漏记重复；表头与上下文统一三级名称。',modal])
     ]),
-    'student-report': page('学生成长档案 · 三角色个人报告页PRD', [
-      p('本页直接展示当前学生、学期与分析范围的成长报告，以统一事实支持学生、教师、家长三种阅读内容。三版本共用学生评价数据和计算口径，仅调整解释与行动建议；教师版是教师阅读学生档案，不代表教师本人成长档案。'),
-      ul(['学生版：查看五育发展、个人优势、活动轨迹、激励评语及成长勋章，获得可执行的个人行动建议。','教师版：查看同一学生事实、教学建议与完整五育班级样本内排名，服务差异化教学。','家长版：查看同一事实及家庭指导方案，按周共同回顾行动并与班主任沟通。','【假设】后台操作者切换阅读版本进行预览；角色按钮不切换登录身份、不扩大数据权限。']),
-      scope(['直接查看报告、学生/教师/家长版本切换；五部分正文、五育雷达及班均对照。','第五部分按体系、维度、细项、评价主体查看分析；当前版本HTML导出与浏览器打印。','同学生学期范围内查看培养方案、四子页签和返回列表；当前角色及报告scope的页内PRD上下文。'],['个人报告生成弹窗、进度、生成状态、批量生成或后台任务。','真实AI撰写、真实Word/PDF生成服务、教师个人档案业务；角色切换授权机制。']),
+    'student-report':page('学生成长档案 · 三角色个人报告页PRD',[
+      p('直接查看学生成长报告，三阅读版本共享事实，仅调整激励和指导。教师版服务教师阅读学生报告，与教师本人成长档案分离。'),
+      ul(['学生查看五育发展、优势、轨迹、激励及勋章。','教师查看教学建议及完整五育班级排名。','家长查看家庭指导和家校沟通；切版本不改变授权身份。']),
+      scope(['三角色、五部分正文、雷达、月曲线、第五部分三级与主体分析。','直接查看、当前版本HTML、打印、培养方案及本页PRD。'],['个人生成任务、进度、批量生成、真实AI和Word/PDF服务。','以阅读版本切换身份权限或教师本人评分。']),
       table([
-        ['报告入口','直接查看','列表或个人头部查看报告立即进入当前学生report子页签，复制personal scope为report scope，不创建任务。','P0','初始role=student；后续切换和再次查看保留当前阅读角色。'],
-        ['报告结构','共同事实','第一部分五育雷达、五维表及班均对照；第二部分优势与成长方向；第三部分活动月度成长轨迹；第五部分多体系与细项分析。','P0','第一至三部分仍是整学期五育事实，不能声称随第五部分任意体系整体替换。'],
-        ['学生版','激励与勋章','第四部分为激励评语与成长勋章；第二部分使用学生行动建议，勋章不重复计分。','P0','无勋章保留暂无勋章记录。'],
-        ['教师版','教学与班级对照','第四部分为教学建议与班级对照，显示同学期完整五育班级样本的综合排名及人数，同分并列。','P0','rank=高于本人综合得分人数+1；不展示其他学生身份。'],
-        ['家长版','家庭指导','第四部分为家庭指导方案，提供家庭行动和每周共同回顾记录、家校沟通建议。','P0','不输出诊断或对学生未来结果的承诺。'],
-        ['分析范围','范围联动','第五部分可选体系、维度、细项及主体；默认五育整体、全部细项主体，activityId由进入报告的scope继承。体系变化清空维度、细项和活动；选择细项同步其维度。','P0','主体为全部、教师、家长/学生；角色按钮与评价主体不同。'],
-        ['输出','HTML与打印','完整五育时导出当前角色HTML；打印切入当前报告再调用浏览器打印。输出保留身份、学期、角色、范围、图表与示例标识，隐藏交互控件。','P0','导出不含导航、按钮、输入或选择器；明细缺数保留空值。'],
-        ['页内说明','报告专属PRD','同一页PRD完整说明三角色区别；上下文实时标记当前studentId、学期、role及report scope。','P0','PRD不加入业务HTML或打印；切角色不复用其他页面PRD。']
+        ['入口','查看即展示','点击查看报告进入report，复制personal scope，不创建生成任务；默认学生阅读版。','P0','角色后续切换本地保留。'],
+        ['共同事实','固定五育内容','第一部分雷达与五育表、第二部分优势方向、第三部分五育月曲线、第四部分角色指导。','P0','第一至四部分不随第五部分切为其他活动事实。'],
+        ['阅读版本','三角色适配','学生激励及勋章，教师教学建议与班级排名，家长家庭指导及周回顾。','P0','同分并列，不展示其他学生身份。'],
+        ['第五部分','三级和主体','评价活动、一级、二级、主体单组入口；活动重置两级，一级重置二级；主体仅全部、教师、家长/学生。','P0','默认五育评价全指标，阅读角色不等于主体。'],
+        ['范围','仅活动名称','评价范围列实际活动名，两级指标用各自字段说明；失效范围明确提示。','P0','不拼接其他分类层。'],
+        ['输出','共用HTML打印','完整五育可输出当前角色报告，复用渲染及范围，展开折叠，保留图表静态说明和示例标识，移除控件和PRD。','P0','无生成任务。'],
+        ['方案','继承范围','方案复制report范围、学生学期；无记录或失效不生成虚构目标。','P0','与固定五育部分范围区分。'],
+        ['页内PRD','阅读及范围上下文',modal,'P0','当前角色、活动、两级和主体。']
       ]),
-      ol(['点击查看报告直接进入report，学生身份与已应用学期保持，将personal scope复制为report scope；页面不要求先生成。','在学生版、教师版、家长版之间切换，事实数据不变，第二部分建议与第四部分标题、内容按角色更新。','在第五部分切换体系、维度、细项及评价主体，更新该范围指标、证据、来源、预警和培养入口；来源分项固定教师和家长/学生两行，并注明单主体筛选例外。','第三部分曲线使用五育整体；当报告scope为五育时继承其活动，否则回到五育全部活动，不把非五育体系活动套入五育曲线。','点击导出报告下载当前角色的独立HTML；点击打印进入报告视图并调用浏览器打印；取消打印后仍保留当前报告、角色与scope。','查看培养方案继承report scope及当前学生学期；返回列表保留已应用名单筛选与页码。']),
-      ul(['无本学期五育结果时仍展示身份与示例标识及暂无评价说明，不输出优势、排名或虚构结论；完整五育不足时头部导出和打印禁用。','第五部分部分细项缺数时保留空值与缺口，已有项可追溯，不能用0替代或借用其他主体数据。','无上一学期可比完整五育值时较上一期显示缺少可比数据，不计算提升；本学期/上学期雷达图例保持原含义。','同分排名并列；班级分母为当前学生所在班级、所选学期完整五育样本，不能使用姓名筛选后单人分母。','角色切换不改变评价主体，主体切换不变阅读角色。勋章缺失显示空态；真实附件、通知和生成任务均不提供。']),
-      p(scoreRule) + p(passRule) + p('共同五育事实读取学生当前学期五维结果，综合为五维等权；较上一期继续减去原上一学期可比综合值，单位为百分点。第五部分通过GrowthAnalysisUI.render与GrowthDetail.analyze读取report scope；家庭/学生来源包含家长、自评、同伴原始记录等权，不设类别50/50权重。') + p('报告第三部分月曲线按当月已有项逐层均值，完整整期评价仍采用必需项齐备规则。导出调用与屏幕相同reportArticle，移除交互控件并展开详情；文件名含学号、学期、角色和示例。') + p('【假设】growth_report_view、growth_report_role_change、growth_report_scope_change、growth_report_export、growth_report_print参数为student_token、term_id、reading_role、activity_id、system_id、dimension_key、indicator_key、evaluator_role、has_data；打印埋点仅代表调用，不代表完成。'),
-      p(localLimit) + ul(['建议为确定性本地规则文案，不能声称大模型实时分析；学生、教师、家长三版本共享事实，差别是阅读与行动建议。','浏览器HTML下载和打印不等于已实现Word/PDF生成或归档服务；浏览器打印另存PDF由用户执行。','完整五育是当前原型导出打印门槛；正式系统若需无五育但其他体系报告，须单独确认完整性与输出规则，不在本页宣称已支持。','指标分数、覆盖与来源需可复算；变化字段统一为较上一期，不变更既有上一学期算法。']),
-      ol(['列表和档案查看报告直接展示，无个人生成弹窗、生成进度、状态或批量任务。','三个版本身份、五育事实、学期和当前第五部分范围一致；学生版为激励与勋章，教师版为教学建议及同分并列班级排名，家长版为家庭指导。','第五部分四体系、维度、细项、主体可切换，联动清空失效参数；阅读role与评价主体独立，PRD上下文能区分。','第一部分保留个人五育雷达及五项数值表与班均对照；第三部分按约定五育活动范围绘制月曲线，空点不补0。','HTML及打印保留当前角色、学生学期、第五部分scope、图表、静态口径和示例标识，输出不含交互或PRD；取消打印保留状态。','无五育结果仍可查看身份与空态，导出打印禁用；缺上期或细项时不编造分数、排名或变化。',modalCheck])
+      ol(['查看直接进入并复制个人范围；切角色仅更新对应指导。','第五部分三级联动更新分析、预警、证据、培养入口。','第三部分选五育时沿用其活动，否则使用当期五育活动，不混入其他活动记录。','输出当前角色与范围；取消打印不丢状态；方案继承report。']),
+      ul(['五育不完整：固定部分显示缺数，不输出完整优势或排名，头部输出禁用。','第五部分无记录/失效保留提示，不用固定五育冒充专项结果。','无上期匹配显示—；无勋章显示空态。','排名用本人班级完整五育全集，不被姓名关键词缩小。','无记录月断点，三段月度说明保持删除。']),
+      p(hierarchy)+p(scoring)+p(migration)+p(comparison)+p('排名=班级同学期完整五育样本中严格高于本人的人数+1，同分并列。第一至四部分固定五育与第五部分单活动分别取数。HTML与打印复用报告渲染，保持角色、学期及范围。')+telemetry('student_report_view、report_role_change、report_scope_change、report_export/print、support_plan_open','student_token、term_id、reading_role、activity_id、dimension_key、indicator_key、subject、format、result'),
+      p(local)+p('角色为阅读适配而非授权。新增非五育活动不能获得虚构五育雷达。长表和图表打印需验证分页与窄屏。'),
+      ol(['直接阅读，无个人生成进度状态；三角色事实相同、建议不同。','第五部分仅一组三级入口，范围仅活动名且两级独立说明。','排名、≥60%边界、缺数及跨期唯一映射可复算，不生成跨活动总分。','固定五育与专项范围清晰，HTML打印图表可读且移除交互和PRD。',modal])
     ]),
-    'ai-report': page('AI评价报告 · 入口演示页PRD', [
-      p('本页保留原有AI评价报告导航与报告列表样式，作为进入学生成长档案的演示入口。当前仅展示静态样例，不执行真实AI分析、报告生成、任务查询或业务状态更新。'),
-      ul(['后台使用者从既有AI评价报告导航进入，识别已有报告列表界面并转到学生成长档案。','演示评审查看静态列结构和入口关系，确认本页不表示AI能力已接入。','【假设】本页是本地产品演示，正式报告任务服务、权限、生成链路及状态机另行设计。']),
-      scope(['保留名称、报告状态禁用输入；查询操作提示；静态一行报告表示例。','前往学生成长档案和行内查看成长档案两个可用跳转入口。','本页专属PRD与AI服务未接入边界。'],['真实AI生成、重新生成、查询过滤、任务进度轮询、报告编辑和导出。','把静态参与人数、生成数或状态作为学生成长分析依据；真实API与状态机实现。']),
+    'ai-report':page('AI评价报告 · 入口演示页PRD',[
+      p('保留既有静态AI评价报告列表与学生档案入口，不执行真实AI生成或任务查询。'),
+      ul(['后台使用者查看静态样例后进入学生档案。','研发明确演示与真实任务服务边界。','【假设】正式AI状态机、授权及审阅另行设计。']),
+      scope(['禁用筛选、查询引导、静态七列表格、两个学生入口、本页PRD。'],['真实查询、生成、轮询、编辑、重试、报告输出。','将静态人数用于学生统计。']),
       table([
-        ['筛选演示','禁用输入','名称输入显示请输入活动名称/报告名称占位且disabled；报告状态下拉为请选择且disabled。','P0','禁用输入不产生查询参数，不接受筛选提交。'],
-        ['操作演示','查询提示','点击查询仅提示请进入学生成长档案查看统计与个人报告，不发出网络请求、不改变样例数据。','P0','提示不表示查询成功。'],
-        ['报告列表','静态字段','显示序号、报告名称、参与人数、已生成报告数、报告状态、创建人、操作七列，保留学生综合素养评价样例。','P0','示例值32、31及部分已生成仅用于界面演示。'],
-        ['导航','学生档案入口','顶部前往学生成长档案及行内查看成长档案均进入学生模块名单，清除当前个人档案和临时方案报告视图。','P0','保留已应用名单基础筛选，不为静态行定位真实活动。'],
-        ['页内说明','AI入口PRD','打开本页九章PRD，说明禁用筛选、静态行和两种入口；上下文为AI评价报告演示页。','P0','没有学生、学期、role或分析scope时不伪造上下文。']
+        ['筛选','禁用','名称与状态控件disabled，不产生查询参数。','P0','不模拟查询成功。'],
+        ['查询','本地提示','仅引导进入学生成长档案，不请求网络或改静态行。','P0','无生成任务。'],
+        ['表格','静态七列','序号、报告名称、参与人数、已生成数、状态、创建人、操作仅演示。','P0','不读GrowthDetail评分。'],
+        ['导航','两个入口','顶部和行内均进入学生名单，保留基础筛选，清临时个人/报告/方案视图。','P0','不绑定虚构活动。'],
+        ['页内PRD','演示上下文',modal,'P0','不伪造学生与范围。']
       ]),
-      ol(['从左侧AI评价报告导航进入，显示页面标题、示例标识、禁用筛选和静态一行列表。','点击查询展示引导提示，当前列表与状态保持，名称及状态不能编辑。','点击顶部前往学生成长档案或行内查看成长档案，切到学生名单；不创建报告任务，不将静态报告行绑定为真实活动筛选。','需要理解本页时打开当前页PRD，关闭后仍在本页且静态内容不变。']),
-      ul(['重复点击查询只重复本地提示，不增加任务或生成计数。','静态行出现部分已生成不意味着后台真实部分完成；无轮询、无进度和可重试任务。','宿主无网络或AI服务时本页仍可展示；不抛出伪造服务错误或执行模拟写入。','进入学生名单保留既有已应用筛选；本页无独立分页、导出、打印或学生范围选择。']),
-      p('本页报告行是固定演示数据，不读取GrowthDetail评分，不计算达标、覆盖或成长趋势。参与人数32、已生成31、创建人及部分已生成文本不参与其他页面统计，也不代表真实用户或任务状态。') + p('【假设】growth_ai_demo_view、growth_ai_demo_query、growth_ai_demo_to_students仅记录page_id、entry_point与is_demo=true；不记录生成成功或任务完成事件。当前未接入埋点服务。'),
-      p(localLimit) + ul(['名称AI评价报告和静态状态容易被误认为真实服务，页面与PRD须保留示例边界，不宣称已连接模型。','真实AI流程需另行定义输入授权、提示词版本、生成状态、失败重试、审阅及事实校验；上述内容不属于本页已实现范围。','本页仅保留现有入口，不改变学生档案的直接查看报告流程。']),
-      ol(['名称与报告状态控件不可输入或切换，表格七列及静态样例可见。','点击查询仅出现引导提示，静态数值不变化，无生成、查询或轮询网络动作。','两个档案入口均进入学生名单，保留已应用基础筛选，不误选静态活动或学生。','页面与PRD明确本地演示边界，不提供真实生成、导出、重试或任务完成声明。',modalCheck])
+      ol(['进入导航显示示例、禁用筛选和静态列表。','查询仅提示；任一档案入口进入学生名单。']),
+      ul(['重复查询无任务或数值变化。','静态部分已生成不表示后台真实进度，无轮询重试。','本页无分页、导出或打印，无网络仍能显示。']),
+      p('静态参与、生成、创建人、状态不参与学生统计。学生与教师业务统一评价活动→一级指标→二级指标，本页不管理目录。')+telemetry('growth_ai_demo_view/query/to_students','entry_point'),
+      p(local)+p('真实AI任务授权、输入、模型、失败重试、审阅与事实校验均未实现。'),
+      ol(['筛选不可操作，七列静态样例与示例标识可见。','查询仅提示且无网络生成任务；两入口进入名单。',modal])
     ]),
-    'teacher-placeholder': page('教师成长档案 · 模块缺失兜底页PRD', [
-      p('本页仅在教师成长档案业务模块未加载时提供导航兜底，说明当前没有可展示的教师档案内容，并支持返回学生档案。已加载的真实教师模块使用其专属页面与PRD，本兜底页不替代教师评价业务设计。'),
-      ul(['后台使用者进入教师成长档案而当前交付未提供教师模块时，获得明确空态并可继续访问学生档案。','研发和测试验证模块缺失时应用可用，不能因兜底出现而误读为教师无评价。','【假设】正式教师模块拥有独立目录、人员、权限与专属PRD，由其实现负责。']),
-      scope(['教师业务模块缺失时的标题、暂无档案内容空态、查看学生成长档案入口。','本页只说明兜底触发与导航；打开教师模块缺失页专属PRD。'],['教师评价体系、教师个人得分、绩效、排名、档案导入、成长分析和教师报告。','覆盖真实教师模块页面或其专属PRD；用学生报告教师版代替教师个人档案。']),
+    'teacher-placeholder':page('教师成长档案 · 模块缺失兜底页PRD',[
+      p('仅当教师模块未加载时提供空态与学生入口，真实教师页面及其PRD由教师模块接管。'),
+      ul(['使用者遇到模块缺失仍可访问学生档案。','研发核验模块缺失不白屏，不误判教师无评价。','【假设】真实教师权限与接口由教师模块定义。']),
+      scope(['缺失标题、空态、学生入口、兜底PRD。'],['教师业务评分、真实身份、排名、目录或报告。','覆盖已加载教师页或以学生报告教师版替代教师档案。']),
       table([
-        ['加载兜底','触发条件','只有教师业务模块未加载或对应入口未提供页面时展示本兜底；存在教师业务页面则由模块接管并使用其PRD。','P0','本页ID=teacher-placeholder，不与真实教师页ID混用。'],
-        ['内容','明确空态','显示教师成长档案标题、示例标识及暂无档案内容，不展示教师得分、姓名、评价次数或虚构结论。','P0','空态表达内容未提供，不等于教师评价为0。'],
-        ['导航','查看学生档案','按钮进入学生成长档案名单，清除临时个人、方案及统计报告视图，保留已应用名单条件。','P0','不借用学生studentId作为教师身份。'],
-        ['页内说明','兜底专属PRD','提供本页九章说明，上下文标为教师模块缺失兜底，不显示不存在的教师、学期或分析范围。','P0','不重复真实教师模块业务PRD。']
+        ['加载','兜底触发','仅教师模块未加载或缺对应页面时显示，已加载则使用真实页面及专属PRD。','P0','page_id=teacher-placeholder。'],
+        ['空态','无内容','显示暂无档案内容和示例标识，不伪造姓名得分次数。','P0','模块缺失不等于0分。'],
+        ['导航','学生入口','进入学生名单，保留基础筛选并清临时个人/报告/方案视图。','P0','学生教师ID不混用。'],
+        ['页内PRD','缺失上下文',modal,'P0','不伪造教师学期和范围。']
       ]),
-      ol(['用户点击教师成长档案导航；若已加载教师业务模块，由真实模块展示其页面及专属PRD。','若模块缺失，展示教师成长档案标题和暂无档案内容，保持左侧教师导航选中。','点击查看学生成长档案后进入学生名单，当前页切换为students-list并使用名单专属PRD；不生成教师档案。','点击本页PRD只查看兜底说明，关闭仍保留当前导航和空态。']),
-      ul(['模块缺失不能导致白屏、死链接或把学生档案误渲染为教师档案。','无教师模块时不显示伪造的教师、学期、评价次数或得分；不能将0分与内容未提供混淆。','真实教师模块恢复或加载成功后应由其专属页面接管，本兜底PRD不覆盖真实教师页面。','兜底没有查询、分页、导出或打印；连续点击学生入口仍进入同一名单状态。']),
-      p('本页没有教师业务数据、评分计算、达标口径或评价活动范围，数据状态仅为教师模块内容未提供。不得从学生档案、学生报告teacher阅读角色或学生评分推导教师个人结果。') + p('【假设】growth_teacher_fallback_view与growth_teacher_fallback_to_students仅记录page_id、fallback_reason和is_demo=true；不记录教师评价事件，不采集人员身份。'),
-      p('本兜底不证明教师模块、教师API或教师权限已实现。真实教师业务的依赖、人员目录与数据规则由其模块专属PRD承担；本页只保证缺失时可导航。') + p('学生个人报告的教师版服务于教师阅读学生数据，与教师个人成长档案使用不同对象和页面标识，开发不得合并。'),
-      ol(['教师模块缺失时可见标题、暂无档案内容及学生档案按钮，无白屏、虚构教师指标或真实服务声明。','已加载真实教师模块时不显示本兜底页面或兜底PRD，不覆盖其专属页面定义。','学生入口进入名单并使用名单页PRD，已应用基础筛选保持，不把学生身份写成教师身份。','页面上下文明确为兜底，不伪造人员、学期、角色和scope；本页无查询分页或业务导出打印。',modalCheck])
+      ol(['教师导航优先真实模块；缺失时展示兜底。','学生入口进入名单，本页PRD关闭保留空态。']),
+      ul(['不能白屏或用学生数据填教师档案。','模块加载恢复后由真实页面接管。','本页无查询、分页、导出、打印。']),
+      p('本页无教师业务数据。真实教师统一评价活动→一级指标→二级指标，areaId/itemId为兼容键，评分由教师专属PRD定义。')+telemetry('growth_teacher_fallback_view/to_students','fallback_reason、entry_point'),
+      p('兜底不证明教师接口权限已实现。学生报告教师阅读版与教师本人档案使用不同对象和页面ID。'),
+      ol(['缺失时明确空态，无虚构评分；加载教师模块时不显示兜底。','学生入口正确保留名单条件且身份不混用；不伪造教师上下文。',modal])
     ])
   });
 })(window);
@@ -3791,7 +3804,7 @@
     const scope=selection.scope;
     state.personalTracking={studentId:s.id,term:state.filters.term,activityId:selection.activityId,dimensionKey:scope?.dimensionKey||'all',indicatorKey:scope?.indicatorKey||'all'};
     const activity=selection.activities.find(a=>a.id===selection.activityId);
-    const options=(items,key,value,emptyText)=>'<option value="all">'+emptyText+'</option>'+items.map(item=>`<option value="${esc(item[key])}" ${item[key]===value?'selected':''}>${esc(item.name)}</option>`).join('');
+    const options=(items,key,value,emptyText)=>'<option value="all" '+(!value||value==='all'?'selected':'')+'>'+emptyText+'</option>'+(!value||value==='all'||items.some(item=>item[key]===value)?'':'<option value="'+esc(value)+'" selected>原'+emptyText.replace('全部','')+'已失效，请重新选择</option>')+items.map(item=>`<option value="${esc(item[key])}" ${item[key]===value?'selected':''}>${esc(item.name)}</option>`).join('');
     const controls=`<div class="ga-person-tracking-filters ga-no-print"><label><span>评价活动：</span><select id="ga-person-tracking-activity" aria-label="个人成长追踪评价活动" ${selection.activities.length?'':'disabled'}>${selection.activities.length?activityOptions(state.filters.term,selection.activityId,false,selection.activities):'<option value="">暂无评价活动</option>'}</select></label><label><span>一级指标：</span><select id="ga-person-tracking-dimension" aria-label="个人成长追踪一级指标" ${activity?'':'disabled'}>${options(selection.dimensions||[],'key',scope?.dimensionKey,'全部一级指标')}</select></label><label><span>二级指标：</span><select id="ga-person-tracking-indicator" aria-label="个人成长追踪二级指标" ${activity?'':'disabled'}>${options(selection.indicators||[],'key',scope?.indicatorKey,'全部二级指标')}</select></label></div>`;
     const body=selection.validScope===false&&selection.activities.length?'<div class="ga-empty" role="status">原评价范围已失效，请重新选择评价活动或指标。</div>':activity&&scope?`<p class="ga-person-tracking-range">${esc(window.GrowthScopeDisplay.describe(state.filters.term,scope))}</p>${UI.renderTrend({studentIds:[s.id],studentId:s.id,term:state.filters.term,scope,context:'personal'})}${F.analyze([s.id],state.filters.term,scope).recordCount?'':'<p class="ga-person-tracking-status" role="status">当前学生在该活动暂无有效评价，补齐评价后查看成长曲线。</p>'}`:'<div class="ga-empty" role="status">当前学生在所选学期暂无已参加的评价活动</div>';
     return `<div class="ga-person-tracking" aria-label="个人成长追踪" aria-live="polite">${controls}${body}</div>`;
