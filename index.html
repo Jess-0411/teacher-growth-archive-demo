@@ -452,7 +452,15 @@
 #ga-root .ga-analysis-main-panel { margin: 0 16px 16px; }
 #ga-root .ga-analysis-main-panel .ga-panel-body { padding: 12px 14px; }
 #ga-root .ga-analysis-table-wrap { margin: 0; }
+#ga-root .ga-grouped-table-wrap { width: auto; max-width: 100%; overflow-x: auto; }
+#ga-root .ga-grouped-label-print { display: none; }
+#ga-root .ga-indicator-results-table td.ga-grouped-label { vertical-align: middle; padding-top: 14px; color: #303133; background: #fcfcfd; white-space: normal; min-width: 76px; max-width: 180px; overflow-wrap: anywhere; }
+#ga-root .ga-indicator-results-table td { font-variant-numeric: tabular-nums; }
+#ga-root .ga-secondary-performance-table { min-width: 530px; }
+#ga-root .ga-panel .ga-secondary-performance-table { min-width: 530px; }
+#ga-root .ga-school-report .ga-school-catalog-table { min-width: 840px; }
 #ga-root .ga-analysis-table { min-width: 910px; }
+#ga-root .ga-panel .ga-analysis-table { min-width: 910px; }
 #ga-root .ga-analysis-table th, #ga-root .ga-analysis-table td { padding-left: 10px; padding-right: 10px; }
 #ga-root .ga-analysis-role-table { min-width: 420px; }
 #ga-root .ga-analysis-note { margin: 12px 0 0; font-size: 11px; color: #909399; line-height: 1.9; }
@@ -473,8 +481,6 @@
 #ga-root .ga-analysis-more summary { color: #18b98d; padding: 5px 0; cursor: pointer; }
 #ga-root .ga-analysis-more[open] summary { margin-bottom: 10px; }
 #ga-root .ga-analysis-footnote { margin-top: 1px; }
-#ga-root .ga-analysis-print-label { display: none; }
-#ga-root .ga-analysis-indicator-list { max-width: 185px; min-width: 125px; white-space: normal; color: #909399; font-size: 11px; line-height: 1.7; margin-top: 5px; }
 #ga-root .ga-five-report-layout { display: grid; grid-template-columns: minmax(250px,1fr) minmax(0,1.2fr); align-items: center; gap: 20px; margin: 12px 0 20px; }
 #ga-root .ga-five-radar { width: 100%; max-width: 400px; margin: 0 auto; }
 #ga-root .ga-five-radar svg { display: block; width: 100%; height: auto; font-size: 12px; }
@@ -524,8 +530,14 @@
   #ga-root .ga-analysis-summary, #ga-root .ga-analysis-scope { break-inside: avoid; }
   #ga-root .ga-analysis-table, #ga-root .ga-analysis-role-table, #ga-root .ga-analysis-aggregate-table { min-width: 0; font-size: 9px; }
   #ga-root .ga-analysis-table th, #ga-root .ga-analysis-table td { padding: 5px 4px; white-space: normal; }
-  #ga-root .ga-analysis-table .ga-link { color: #303133; }
-  #ga-root .ga-analysis-print-label { display: inline; }
+  #ga-root .ga-indicator-results-table .ga-grouped-label-screen { display: none !important; }
+  #ga-root .ga-indicator-results-table .ga-grouped-label-print { display: table-cell; }
+  #ga-root .ga-indicator-results-table, #ga-root .ga-panel .ga-secondary-performance-table, #ga-root .ga-panel .ga-analysis-table, #ga-root .ga-school-report .ga-school-catalog-table { min-width: 0; width: 100%; table-layout: fixed; font-size: 9px; }
+  #ga-root .ga-indicator-results-table th, #ga-root .ga-indicator-results-table td { min-width: 0; max-width: none; padding: 5px 4px; white-space: normal; overflow-wrap: anywhere; }
+  #ga-root .ga-indicator-results-table td.ga-grouped-label { min-width: 0; max-width: none; padding-top: 5px; background: transparent; }
+  #ga-root .ga-indicator-results-table thead { display: table-header-group; }
+  #ga-root .ga-indicator-results-table tr { break-inside: avoid; page-break-inside: avoid; }
+  #ga-root .ga-grouped-table-wrap { overflow: visible; max-width: 100%; }
   #ga-root .ga-analysis-grid { grid-template-columns: minmax(0, 1fr); }
   #ga-root .ga-analysis-trend svg { max-height: 240px; }
   #ga-root .ga-analysis-table-wrap { overflow: visible; }
@@ -2600,6 +2612,19 @@
   whole('classMean','活动整期班级均值','当前所选学生所属班级的全部应评价学生中，当前范围评价完整者的个人得分率算术均值。',scoreOrder,'班级参考包含所选学生所属各班全部学生；使用同学期、活动、指标及主体，保留活动参与资格限制，不只使用勾选学生。');
   whole('gradeMean','活动整期年级均值','当前所选学生所属年级的全部应评价学生中，当前范围评价完整者的个人得分率算术均值。',scoreOrder,'年级参考包含所选学生所属各年级全部学生；使用同学期、活动、指标及主体，保留活动参与资格限制，不只使用勾选学生。');
   whole('count','活动整期有效人数','当前活动应评价范围中，所选指标及主体范围评价完整、可计算个人结果的去重学生数。','逐人验证全部所需二级指标均有有效记录；同一学生多条记录只计1人。一级指标或二级指标行按该行所需指标核验，不以活动其他行是否完整替代。');
+  const secondaryScope='当前表格每行对应的评价活动、一级指标及唯一二级指标；使用已应用的学生范围、学期和评价主体，并与活动参与名单取交集。一级指标仅作为表格分组，不生成一级汇总成绩。';
+  const secondaryValid='本二级指标至少存在一条状态有效、得分及满分合法、日期在学期与活动范围内的评分，才形成该生本项结果。0分是有效结果；本项缺失不补0，所属一级或其他二级不完整不抹去本项已有结果。无有效人数时得分及比率显示“—”，人数及证据条数显示实际整数。';
+  const secondaryPrecision='沿用既有计算精度，达标及跨期变化使用未按展示精度取整的结果；页面得分率、比率及百分点变化显示1位小数，人数和条数为整数。59.96%即使显示60.0%仍未达标，不用显示值重新判定。';
+  function secondary(key,label,formula,logic,scope){add(key,label,formula,logic,scope||secondaryScope,secondaryValid,secondaryPrecision);}
+  secondary('secondaryScore','二级指标得分率','个人本项得分率＝本二级指标有效记录(实际得分÷对应满分×100%)的算术平均；本行得分率＝本项有效学生个人得分率的算术平均。','每条记录先归一，再按学生与当前二级指标聚合，最后对本项有效学生等权平均。个人档案只计算当前学生；不先计算一级汇总，不将其他二级分值并入本行。');
+  secondary('secondaryPassRate','二级指标达标率','本二级指标个人未取整得分率≥60%的学生数÷本项有效学生数×100%。','逐人计算本二级指标结果并判断≥60%，再计算达标占比。60%计入达标，59.96%不计入；不要求该生其他二级指标或整个活动同时完整、达标。分母仅为本行有效人数。');
+  secondary('secondaryPrevious','二级指标较上一期','本行本期未取整二级指标均值－上一学期唯一可比活动同一二级指标的未取整均值，单位为百分点。','上一期指上一学期；先按唯一活动比较标识及指标归属匹配，再分别计算两期本项有效学生结果后相减。个人页分别计算本人两期结果；群体页两期样本独立。任一期无结果或活动、指标不可比时显示“—”，不按0比较。');
+  secondary('secondaryClassMean','二级指标班级均值','当前所选学生所属班级的全部活动参与学生中，本二级指标有有效结果者的个人得分率算术平均。','确定所选学生所属班级并取班级学生并集，核对活动参与资格后，按同学期、同活动、同二级指标及同评价主体逐人计算再等权平均。包含所选学生，不仅使用当前筛选命中的少数学生，不要求其他二级完整。',secondaryScope+' 班级参考范围扩展为当前所选学生所属班级的全部学生。');
+  secondary('secondaryGradeMean','二级指标年级均值','当前所选学生所属年级的全部活动参与学生中，本二级指标有有效结果者的个人得分率算术平均。','确定所选学生所属年级并取年级学生并集，核对活动参与资格后，按同学期、同活动、同二级指标及同评价主体逐人计算再等权平均。不用一级成绩替代，不要求其他二级完整。',secondaryScope+' 年级参考范围扩展为当前所选学生所属年级的全部学生。');
+  secondary('secondaryCount','二级指标有效人数','活动应评价范围内，当前二级指标可计算个人得分率的去重学生数。','先确定本行应评价学生，再逐人检查本二级指标有效评分；同一学生多条记录仅计1人。各行独立取样，同一学生可出现在多行，行人数不可相加为学生总数，也不等于活动整期完整评价人数。');
+  secondary('secondaryRecords','二级指标有效评价证据','当前二级指标参与计算的有效评分记录条数之和。','按本行活动、指标、学生、学期及主体筛选，校验状态、分值、满分和日期后逐条计数。同一学生多条有效记录分别计条；父级未完整学生的已有有效记录仍计入。不等同原始记录查询条数或有效学生人数。');
+  secondary('secondaryCoverage','二级指标评价覆盖率','本二级指标有效人数÷本活动应评价人数×100%。','先按当前学生范围与活动名单确定应评价人数，再统计本项可计算个人结果的人数；只核验本二级指标，不要求所属一级或整个活动完整。与本项达标率分别计算，分母为0时显示“—”。');
+  secondary('secondaryMissing','二级指标缺少评价人数','本活动应评价人数－本二级指标有效人数。','在活动参与资格范围内逐人核对当前二级指标，缺少本项有效结果者计入缺口；其他二级是否完整不改变本项缺口，未参加活动者不计入。缺少评价不判为0分或未达标。');
   whole('compare','横向对比','各班级或年级的得分率、达标率、有效人数和记录数分别独立计算。','先按班级或年级分组，再使用同一评价活动、学期、指标及主体计算各组结果；得分率按完整学生等权平均，达标率按未取整个人结果≥60%判断。不将各组直接相加为总分。');
   whole('studentExpectedCount','活动应评价人数','当前已应用学生范围与活动参与名单交集的去重人数。','先确定所选学生，再核对活动参与资格。未配置名单采用所选学生；明确空名单为0。未参加活动者不计入完整评价、缺失或预警分母。');
   whole('studentCompleteCount','整期完整评价人数','所选活动与指标、主体范围内，可计算完整个人得分率的去重学生数。','每人必须覆盖当前范围全部所需二级指标；部分评价可提供逐项证据，但不进入整期综合人数。');
@@ -2707,7 +2732,7 @@
   function systemFor(scope) { return data().systems.find(item => item.id === scope.systemId); }
   function dimensionsFor(scope) {
     const activity = data().getActivity(scope.activityId), system = systemFor(scope);
-    return activity && system ? system.dimensions.filter(item => activity.firstLevelKeys.includes(item.key)) : [];
+    return activity && system ? activity.firstLevelKeys.map(key => system.dimensions.find(item => item.key === key)).filter(Boolean) : [];
   }
   function selectionName(scope) {
     const activity = data().getActivity(scope.activityId);
@@ -2776,31 +2801,57 @@
 
   function detailRows(ids, term, scope) {
     const dimensions = dimensionsFor(scope);
-    const selected = dimensions.find(item => item.key === scope.dimensionKey);
-    if (!selected) return dimensions.map(dimension => ({dimension,indicator:null,name:dimension.name,scope:rowScope(scope, dimension)}));
-    const indicators = scope.indicatorKey === 'all' ? selected.indicators : selected.indicators.filter(item => item.key === scope.indicatorKey);
-    return indicators.map(indicator => ({dimension:selected,indicator,name:indicator.name,scope:rowScope(scope, selected, indicator)}));
+    return dimensions.filter(dimension => scope.dimensionKey === 'all' || dimension.key === scope.dimensionKey).flatMap(dimension =>
+      dimension.indicators.map(indicator => ({dimension,indicator,name:indicator.name,scope:rowScope(scope, dimension, indicator)})));
+  }
+
+  // Group keys include the activity identity; names are display text and never define a group.
+  // Print-only cells repeat the group names on every row so page breaks retain context.
+  function renderGroupedTable(options) {
+    const settings = options || {}, rows = settings.rows || [], heads = settings.heads || [];
+    const groupedRows = rows.map((row, index) => {
+      const groupCells = (row.groups || []).map((group, column) => {
+        const previous = index ? (rows[index - 1].groups || [])[column] : null;
+        let merged = '';
+        if (!previous || previous.key !== group.key) {
+          let span = 1;
+          while (index + span < rows.length && rows[index + span].groups && rows[index + span].groups[column] && rows[index + span].groups[column].key === group.key) span++;
+          merged = '<td class="ga-grouped-label ga-grouped-label-screen" rowspan="' + span + '" data-group-key="' + esc(group.key) + '">' + esc(group.label) + '</td>';
+        }
+        return merged + '<td class="ga-grouped-label ga-grouped-label-print" aria-hidden="true">' + esc(group.label) + '</td>';
+      }).join('');
+      return '<tr data-activity-id="' + esc(row.activityId) + '" data-first-level-key="' + esc(row.dimensionKey) + '" data-indicator-key="' + esc(row.indicatorKey) + '"' + (row.calculationScope ? ' data-calculation-scope="' + esc(row.calculationScope) + '"' : '') + '>' + groupCells + row.cells.map(cell => '<td>' + cell + '</td>').join('') + '</tr>';
+    }).join('');
+    return '<div class="ga-table-wrap ga-grouped-table-wrap ' + esc(settings.wrapperClass || '') + '"><table class="ga-table ga-indicator-results-table ' + esc(settings.tableClass || '') + '" data-result-level="secondary" aria-label="' + esc(settings.label || '二级指标结果') + '"><thead><tr>' + heads.map(head => '<th>' + head + '</th>').join('') + '</tr></thead><tbody>' + (groupedRows || '<tr><td colspan="' + heads.length + '">' + empty('当前范围暂无已配置二级指标') + '</td></tr>') + '</tbody></table></div>';
+  }
+
+  function resultRow(row, scope, cells, calculation) {
+    return {activityId:scope.activityId,dimensionKey:row.dimension.key,indicatorKey:row.indicator.key,
+      groups:[{key:scope.activityId + '|' + row.dimension.key,label:row.dimension.name}],cells,calculationScope:calculation};
   }
 
   function comparisonTable(ids, term, scope, context, references) {
-    const selectedDimension = dimensionsFor(scope).find(item => item.key === scope.dimensionKey);
-    const showActions = !selectedDimension;
     const rows = detailRows(ids, term, scope);
     const previous = previousTerm(term);
-    const personal = context === 'personal';
-    return '<div class="ga-table-wrap ga-analysis-table-wrap"><table class="ga-table ga-analysis-table" aria-label="多维评价得分与对比"><thead><tr><th>' + (selectedDimension ? '二级指标' : '一级指标') + '</th>' + metricHead('得分率','score',context) + metricHead('达标率','passRate',context) + metricHead('较上一期',personal ? 'prevPeriod' : 'change',context) + metricHead('班级均值','classMean',context) + metricHead('年级均值','gradeMean',context) + metricHead('有效人数','count',context) + metricHead('评价证据','studentEffectiveRecords') + (showActions ? '<th class="ga-no-print">分析</th>' : '') + '</tr></thead><tbody>' +
-      rows.map(row => {
+    return renderGroupedTable({label:'多维评价得分与对比',wrapperClass:'ga-analysis-table-wrap',tableClass:'ga-analysis-table',
+      heads:['一级指标','二级指标','得分率' + hint('secondaryScore'),'达标率' + hint('secondaryPassRate'),'较上一期' + hint('secondaryPrevious'),'班级均值' + hint('secondaryClassMean'),'年级均值' + hint('secondaryGradeMean'),'有效人数' + hint('secondaryCount'),'评价证据' + hint('secondaryRecords')],
+      rows:rows.map(row => {
         const own = safeAnalyze(ids, term, row.scope);
         const previousScope = data().previousScope(term,row.scope);
         const before = previous && previousScope ? safeAnalyze(ids, previous, previousScope) : null;
         const classMean = safeAnalyze(references.classIds, term, row.scope).score;
         const gradeMean = safeAnalyze(references.gradeIds, term, row.scope).score;
-        const interactiveLabel = '<button type="button" class="ga-link ga-no-print" data-action="scope-dimension" data-dimension="' + esc(row.dimension.key) + '" data-context="' + esc(context) + '">' + esc(row.name) + '</button>';
-        const mainLabel = row.indicator || ['school','report','stats-report'].includes(context) ? esc(row.name) : interactiveLabel + '<span class="ga-analysis-print-label">' + esc(row.name) + '</span>';
-        const label = mainLabel + (!row.indicator ? '<div class="ga-analysis-indicator-list">' + row.dimension.indicators.map(item=>esc(item.name)).join('、') + '</div>' : '');
-        const action = showActions ? '<button type="button" class="ga-link" data-action="scope-dimension" data-dimension="' + esc(row.dimension.key) + '" data-context="' + esc(context) + '">查看指标</button>' : '';
-        return '<tr><td>' + label + '</td><td>' + scoreLabel(own.score,own.rawScore) + '</td><td>' + percent(own.passRate) + '</td><td>' + delta(finite(own.rawScore)?own.rawScore:own.score,before?(finite(before.rawScore)?before.rawScore:before.score):null) + '</td><td>' + percent(classMean) + '</td><td>' + percent(gradeMean) + '</td><td>' + own.count + '</td><td>' + own.recordCount + ' 条</td>' + (showActions ? '<td class="ga-no-print">' + action + '</td>' : '') + '</tr>';
-      }).join('') + '</tbody></table></div><p class="ga-note ga-analysis-note">班级、年级均值使用当前所选学生所属班级、年级的全部学生，在相同评价活动、一级指标、二级指标、学期和评价主体范围内计算。缺失评价不计零分；有效人数及证据数随筛选同步更新。</p>';
+        return resultRow(row,scope,[esc(row.name),scoreLabel(own.score,own.rawScore),percent(own.passRate),delta(finite(own.rawScore)?own.rawScore:own.score,before?(finite(before.rawScore)?before.rawScore:before.score):null),percent(classMean),percent(gradeMean),own.count,own.recordCount + ' 条'],calculationScope(ids,term,row.scope) + ' 二级指标：' + row.name + '。');
+      })}) + '<p class="ga-note ga-analysis-note">各行按二级指标独立统计，有效人数不跨行相加。班级、年级均值使用当前所选学生所属班级、年级的全部学生，在相同评价活动、一级指标、二级指标、学期和评价主体范围内计算。缺失评价不计零分；有效人数及证据数随筛选同步更新。</p>';
+  }
+
+  function renderSecondaryPerformance(options) {
+    const ids=options.studentIds||[],term=options.term,scope=normalizeStudentScope(options.scope,term);
+    return renderGroupedTable({label:'综合评价得分率和达标率',tableClass:'ga-secondary-performance-table',heads:['一级指标','二级指标','得分率' + hint('secondaryScore'),'达标率' + hint('secondaryPassRate'),'有效人数' + hint('secondaryCount')],
+      rows:detailRows(ids,term,scope).map(row=>{
+        const value=safeAnalyze(ids,term,row.scope);
+        return resultRow(row,scope,[esc(row.name),'<div class="ga-inline-bar"><span style="width:' + (finite(value.score)?value.score:0) + '%"></span></div>' + percent(value.score),percent(value.passRate),value.count],calculationScope(ids,term,row.scope) + ' 二级指标：' + row.name + '。');
+      })});
   }
 
   function chartSize(context) {
@@ -2910,7 +2961,7 @@
     const references = {classIds:groupIds(ids,'class',settings.studentId),gradeIds:groupIds(ids,'grade',settings.studentId)};
     const result = safeAnalyze(ids,term,scope);
     const selectedDimension = dimensionsFor(scope).find(item => item.key === scope.dimensionKey);
-    const heading = selectedDimension ? selectedDimension.name + '二级指标分析' : resolved.activity.name + '一级指标分析';
+    const heading = selectedDimension ? selectedDimension.name + '二级指标分析' : resolved.activity.name + '二级指标分析';
     const passRule = '当前范围个人得分率≥60%计为达标，按未取整得分判断；达标率＝达标人数÷当前范围完整评价人数×100%。';
     const scoringAssumption = '在所选活动配置与当前指标范围内，一级指标等权、一级指标内二级指标等权；不同量纲指标按配置量表转换。';
     const scopeSummary = '<p class="ga-analysis-selection"><strong>评价活动：</strong>' + esc(resolved.activity.name) + '　<strong>一级指标：</strong>' + esc(selectedDimension ? selectedDimension.name : '全部一级指标') + '　<strong>评价主体：</strong>' + esc(scope.role === 'all' ? '全部' : scope.role) + '</p>';
@@ -2939,7 +2990,7 @@
     const axisKey=numberedAxes?'<div class="ga-radar-axis-key" role="list" aria-label="雷达图一级指标编号对照">'+values.map((item,index)=>{const reference=comparison.find(value=>value.key===item.key);return '<div class="ga-radar-axis-key-item" role="listitem"><span class="ga-radar-axis-key-number">'+(index+1)+'</span><span class="ga-radar-axis-key-name">'+esc(item.name)+'</span><span class="ga-radar-axis-key-value">'+esc(options.seriesName||'个人得分率')+' '+percent(item.score)+(comparison.length?' · '+esc(options.comparisonName||'对比均值')+' '+percent(reference&&reference.score):'')+'</span></div>';}).join('')+'</div>':'';
     return '<div class="ga-five-radar"><svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+esc(options.title||'五育发展概况雷达图')+'"><title>'+esc(values.map(v=>v.name+' '+percent(v.score)).join('，'))+'</title>'+grid+axes+scale+compareShape+ownShape+'</svg><div class="ga-legend"><span><i class="ga-dot"></i>'+esc(options.seriesName||'个人得分率')+hint(options.scoreHelpKey||'score')+'</span>'+(comparison.some(item=>values.some(value=>value.key===item.key)&&finite(item.score))?'<span><i class="ga-dot" style="background:#719ce7"></i>'+esc(options.comparisonName||'对比均值')+hint(options.comparisonHelpKey||'studentActivityPreviousScore')+'</span>':'')+'</div>'+axisKey+(!complete(values)?'<p class="ga-note">'+esc(typeof options.missingText==='string'&&options.missingText.trim()?options.missingText:'五育数据尚未完整，不将缺失一级指标绘制为零分。')+'</p>':'')+'</div>';
   }
-  global.GrowthAnalysisUI = {render,renderControls:controls,normalizeScope:normalize,normalizeStudentScope,summary,selectionName,fiveRadar,renderTrend(options){const ids=options.studentIds||[],scope=normalizeStudentScope(options.scope,options.term),resolved=data().resolveScope(scope,options.term);return '<div class="ga-analysis-standalone-trend" data-calculation-scope="'+esc(calculationScope(ids,options.term,scope))+'"><h4>活动月度成长趋势</h4>'+(resolved.valid?trendChart(ids,options.term,scope,options.context||'report',{classIds:groupIds(ids,'class',options.studentId),gradeIds:groupIds(ids,'grade',options.studentId)}):empty('当前评价范围已失效，请重新选择评价活动或指标。'))+'</div>';}};
+  global.GrowthAnalysisUI = {render,renderGroupedTable,renderSecondaryPerformance,renderControls:controls,normalizeScope:normalize,normalizeStudentScope,summary,selectionName,fiveRadar,renderTrend(options){const ids=options.studentIds||[],scope=normalizeStudentScope(options.scope,options.term),resolved=data().resolveScope(scope,options.term);return '<div class="ga-analysis-standalone-trend" data-calculation-scope="'+esc(calculationScope(ids,options.term,scope))+'"><h4>活动月度成长趋势</h4>'+(resolved.valid?trendChart(ids,options.term,scope,options.context||'report',{classIds:groupIds(ids,'class',options.studentId),gradeIds:groupIds(ids,'grade',options.studentId)}):empty('当前评价范围已失效，请重新选择评价活动或指标。'))+'</div>';}};
 })(window);
 
 /* 成长概览活动选择及两卡渲染。仅使用当前活动的整期结果，不修改其他页面范围。 */
@@ -3334,8 +3385,14 @@
     const classCount=new Set(D.students.map(s=>s.classId)).size,gradeCount=new Set(D.students.map(s=>s.grade)).size;
     const completeFields=['studentNo','name','classId','grade','sex','birthDate'];
     const fieldFull=D.students.filter(s=>completeFields.every(k=>s[k])).length;
-    const catalog=all.flatMap(({activity,stat})=>stat.dimensions.flatMap(dim=>dim.indicators.map(i=>[e(activity.name),e(dim.name),e(i.name),p(i.score),p(i.passRate),i.count+' / '+stat.expectedCount,stat.expectedCount-i.count,p(i.coverage)])));
-    const firstLevelCount=all.reduce((sum,{stat})=>sum+stat.dimensions.length,0);
+    const catalog=all.flatMap(({activity,stat})=>activity.firstLevelKeys.map(key=>F.getDimension(activity.systemId,key)).filter(Boolean).flatMap(dim=>dim.indicators.map(indicator=>{
+      const i=F.analyze(ids,term,{activityId:activity.id,systemId:activity.systemId,dimensionKey:dim.key,indicatorKey:indicator.key,role:'all'});
+      return {activityId:activity.id,dimensionKey:dim.key,indicatorKey:indicator.key,
+        groups:[{key:activity.id,label:activity.name},{key:activity.id+'|'+dim.key,label:dim.name}],
+        cells:[e(indicator.name),p(i.score),p(i.passRate),i.count+' / '+stat.expectedCount,stat.expectedCount-i.count,p(i.coverage)],
+        calculationScope:'已应用学期：'+t.name+'；全校名册'+ids.length+'人；评价活动：'+activity.name+'；一级指标：'+dim.name+'；二级指标：'+indicator.name+'；全部评价主体。'};
+    })));
+    const firstLevelCount=all.reduce((sum,{activity})=>sum+activity.firstLevelKeys.length,0);
     const groups=compare==='grade'?[...new Set(D.students.map(s=>s.grade))].map(g=>({name:g,members:D.students.filter(s=>s.grade===g)})):D.classes.map(c=>({name:c.name,members:D.students.filter(s=>s.classId===c.id)}));
     const resolved=F.resolveScope(scope,term);
     const wholeScope='已应用学期：'+t.name+'；学生范围：全校名册'+ids.length+'人；评价范围：本学期全部配置活动，各活动独立，全部一级与二级指标、全部评价主体。';
@@ -3347,7 +3404,7 @@
       ${section('三 全校综合评价发展概况',global.GrowthSchoolOverviewUI.render({term}),'ga-school-overview-section')}
       ${section('四 评价活动与指标深入分析',global.GrowthAnalysisUI.render({studentIds:ids,term,scope:resolved.scope,context:'school'}))}
       ${section('五 年级与班级横向对比',`<div data-calculation-scope="${e(appliedScope)}"><div class="ga-school-compare ga-no-print"><label>对比范围：<select id="ga-school-compare" aria-label="学校报告对比范围"><option value="class" ${compare==='class'?'selected':''}>班级对比</option><option value="grade" ${compare==='grade'?'selected':''}>年级对比</option></select></label></div><p class="ga-note">对比各班级或年级的评价得分率均值、达标率和有效人数，采用相同学期、评价活动、一级指标、二级指标和评价主体。${help('studentClassComparison')}</p>${resolved.valid?table([compare==='class'?'班级':'年级',field('学生数','studentPopulation'),field('有评价人数','studentCompleteCount'),field('覆盖率','studentCoverage'),field('得分率','score'),field('达标率','passRate'),field('评价次数','studentEffectiveRecords')],groupRows,'学校横向对比'):'<div class="ga-empty">当前评价范围已失效，请重新选择后查看横向对比。</div>'}</div>`)}
-      ${section('六 完整评价目录与二级指标结果',`<p>当前学期配置${all.length}项评价活动、${firstLevelCount}个一级指标、${catalog.length}个二级指标${help('studentCatalogCounts')}。下表按全校、当前学期、各评价活动及全部评价主体独立展示完整结果，不生成跨活动综合总分；专项筛选结果见第四、第五部分。</p><details class="ga-school-catalog"><summary>查看全部${catalog.length}个二级指标的得分、达标与评价缺口${help('studentCatalogCounts')}</summary>${table(['评价活动','一级指标','二级指标',field('得分率','score'),field('达标率','passRate'),field('有评价 / 应评价人数','studentCompleteCount')+help('studentExpectedCount'),field('缺少评价人数','studentMissing'),field('覆盖率','studentCoverage')],catalog,'学校完整评价目录')}</details>`)}
+      ${section('六 完整评价目录与二级指标结果',`<p>当前学期配置${all.length}项评价活动、${firstLevelCount}个一级指标、${catalog.length}个二级指标${help('studentCatalogCounts')}。下表按全校、当前学期、各评价活动及全部评价主体独立展示完整结果，不生成跨活动综合总分；专项筛选结果见第四、第五部分。各行有效人数与评价缺口按二级指标计算，不跨行相加。</p><details class="ga-school-catalog"><summary>查看全部${catalog.length}个二级指标的得分、达标与评价缺口${help('studentCatalogCounts')}</summary>${global.GrowthAnalysisUI.renderGroupedTable({heads:['评价活动','一级指标','二级指标',field('得分率','secondaryScore'),field('达标率','secondaryPassRate'),field('有评价 / 应评价人数','secondaryCount')+help('studentExpectedCount'),field('缺少评价人数','secondaryMissing'),field('覆盖率','secondaryCoverage')],rows:catalog,label:'学校完整评价目录',tableClass:'ga-school-table ga-school-catalog-table'})}</details>`)}
       ${section('七 预警干预与教育决策建议',global.GrowthSupportUI.render({studentIds:ids,term,scope:resolved.scope,context:'school',expanded:true}))}
       <p class="ga-note">数据范围：全校学生；截至 ${e(t.end)}。全部数值为合成示例，得分率达到满分60%即达标；评分映射和权重为原型假设。二级指标内容来自原始学生评价功能描述。</p></article>`;
   }
@@ -3403,8 +3460,8 @@
   const local='当前人员、目录、评分、曲线、评语、勋章与建议均为本地合成演示，未接入真实后端、AI、登录权限或执行通知。【假设】正式接口按学校与人员授权并由服务端复验范围、记录状态和版本。';
   const modal='右上角PRD按钮打开当前页专属九章只读弹窗，显示当前上下文；关闭后人员、学期、角色、筛选、页码与范围不变。支持键盘关闭及焦点返回；PRD按钮、弹窗及内容不进入业务导出或打印。';
   const telemetry=(events,fields)=>p('【假设】正式埋点：'+events+'；参数含page_id、is_demo、'+fields+'。使用稳定ID/脱敏标识，不采集姓名、学号、评语和关键词原文；当前无上报。');
-  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.3',updatedAt:'2026-11-15',pages:{}};
-  global.GrowthPagePRD.version='V2.3';
+  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.4',updatedAt:'2026-11-15',pages:{}};
+  global.GrowthPagePRD.version='V2.4';
   global.GrowthPagePRD.updatedAt='2026-11-15';
   Object.assign(global.GrowthPagePRD.pages,{
     'students-list':page('学生成长档案 · 学生名单页PRD',[
@@ -3475,9 +3532,9 @@
       scope(['三角色、五部分正文、雷达、月曲线、第五部分活动、一级及主体分析，保留全部所属二级结果。','直接查看、当前版本HTML、打印、培养方案及本页PRD。'],['个人生成任务、进度、批量生成、真实AI和Word/PDF服务。','以阅读版本切换身份权限或教师本人评分。']),
       table([
         ['入口','查看即展示','点击查看报告进入report，复制personal scope，不创建生成任务；默认学生阅读版。','P0','角色后续切换本地保留。'],
-        ['共同事实','固定五育内容','第一部分雷达与五育表、第二部分优势方向、第三部分五育月曲线、第四部分角色指导。','P0','第一至四部分不随第五部分切为其他活动事实。'],
+        ['共同事实','固定五育内容','第一部分雷达与雷达旁固定五育快照表、第二部分优势方向、第三部分五育月曲线、第四部分角色指导。雷达旁表是一级数值行的明确例外，保持五育快照来源和既有三列。','P0','第一至四部分不随第五部分切为其他活动事实。'],
         ['阅读版本','三角色适配','学生激励及勋章，教师教学建议与班级排名，家长家庭指导及周回顾。','P0','同分并列，不展示其他学生身份。'],
-        ['第五部分','活动一级和主体','评价活动、一级、主体单组入口；活动重置一级，一级内展示全部二级；主体仅全部、教师、家长/学生。','P0','默认五育评价全指标，阅读角色不等于主体。'],
+        ['第五部分','活动一级和主体','评价活动、一级、主体单组入口；活动重置一级，全部一级与指定一级均直接展示所属全部二级结果，一级名称仅作rowspan分组；主体仅全部、教师、家长/学生。','P0','默认五育评价全指标，三阅读角色共用二级行合同，阅读角色不等于主体。'],
         ['范围','仅活动名称','评价范围列实际活动名，一级与主体独立说明，不列二级筛选字段；失效范围明确提示。','P0','不拼接其他分类层。'],
         ['输出','共用HTML打印','完整五育可输出当前角色报告，复用渲染及范围，展开折叠，保留图表静态说明和示例标识，移除控件和PRD。','P0','无生成任务。'],
         ['方案','继承范围','方案复制report范围、学生学期；无记录或失效不生成虚构目标。','P0','与固定五育部分范围区分。'],
@@ -3542,8 +3599,8 @@
   const local='本地人员、目录、评分、趋势、证据和建议均为合成演示。未接入后台、权限、AI、通知、方案执行或真实干预服务。【假设】正式接口由服务端按学校及人员授权、校验记录与目录版本。';
   const modal='本页右上角PRD只读弹窗展示专属九章与当前上下文；关闭不改变筛选、范围、学期、人员、角色或页码。支持键盘关闭及焦点返回；PRD控件与内容不进入业务HTML导出或打印。';
   const telemetry=(events,fields)=>p('【假设】正式埋点：'+events+'；参数含page_id、is_demo、'+fields+'。不记录姓名、学号、搜索原文、评语或建议正文；人员ID脱敏，当前未上报。');
-  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.3',updatedAt:'2026-11-15',pages:{}};
-  global.GrowthPagePRD.version='V2.3';
+  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.4',updatedAt:'2026-11-15',pages:{}};
+  global.GrowthPagePRD.version='V2.4';
   global.GrowthPagePRD.updatedAt='2026-11-15';
   Object.assign(global.GrowthPagePRD.pages,{
     'student-analysis':page('个人档案 · 多维分析页PRD',[
@@ -3552,7 +3609,7 @@
       scope(['单个活动、一级指标及主体筛选、指标表、月曲线、组织参考和证据。','低于60%二级指标标红、具体改进建议、个人培养入口、本页PRD。'],['重复模板筛选、跨活动总分、评价录入或真实方案执行。','缺失判0、心理诊断、把相对最低直接判未达标。']),
       table([
         ['筛选','活动一级与主体入口',scopes,'P0','个人scope独立于追踪和报告。'],
-        ['指标','表格与下钻','全部一级时列各一级结果并保留一级名称及查看指标入口；选一级时列其全部二级结果，二级名称为纯文本，不提供查看分析，也不保留空分析列。','P0','无数据指标保留名称及—。'],
+        ['指标','一级分组二级行','全部一级与指定一级均逐行展示所属全部二级结果，一级名称仅作rowspan分组；主分析表固定一级指标、二级指标、得分率、达标率、较上一期、班级均值、年级均值、有效人数、评价证据九列。','P0','无一级数值行、分析列、查看指标按钮或名称点击；无数据配置二级行保留。'],
         ['计算口径','静态输出','得分率、达标率、较上一期、班级均值、年级均值、有效人数保留原算法；页面不展示计算问号或浮层，相关说明仅进入报告导出与打印附录。','P0','解释分母、完整性、上一学期和未取整≥60%。'],
         ['组织参考','班级和年级均值','取本人所在班级/年级全部学生，在相同活动、指标和主体下独立计算。','P0','不受姓名关键词限制；显式名单仍生效。'],
         ['画像','月度发展',monthly,'P0','个人、班级、年级三条曲线。'],
@@ -3561,11 +3618,11 @@
         ['证据','当前范围记录','展示当前活动、一级及主体范围内全部二级原始记录，保留原始分、满分、日期和内容。','P1','页面可按现有限制展示最近32条。'],
         ['页内PRD','专属上下文',modal,'P0','学生、学期、活动、一级及主体，无独立二级筛选字段。']
       ]),
-      ol(['进入页签默认当期五育评价全指标及全部主体，或恢复已保存个人范围。','切活动清一级；一级下钻或切换展示全部所属二级，界面统一indicatorKey为all后解析取数。','重算当前个人、本人班级和年级参考，按previousScope计算可比上一期。','红色二级项可追溯证据并打开同范围培养方案；筛选不覆盖追踪。']),
+      ol(['进入页签默认当期五育评价全指标及全部主体，或恢复已保存个人范围。','切活动清一级；保留一级筛选，全部一级或指定一级都直接展示其配置二级行，界面统一indicatorKey为all后解析取数。','按每行稳定二级键重算当前个人、本人班级和年级参考，按previousScope计算同二级可比上一期。','红色二级项可追溯证据并打开同范围培养方案；筛选不覆盖追踪。']),
       ul(['失效范围显示原因，保留可重新选择入口，不自动扩范围。','无活动、无人参与、无评价或部分评价分别展示；部分事实不冒充完整活动结果。','无上期唯一映射或缺数显示—；有效0分属于低分。','同名二级指标按稳定键区分；被参与名单排除不生成分数结论。','群体均值达标不能替代个人达标，图表不以0补缺。']),
-      p(model)+p(scopes)+p(scoring)+p(participants)+p(migration)+p(previous)+telemetry('student_analysis_view、analysis_scope_change、analysis_drilldown、support_plan_open','student_token、term_id、activity_id、dimension_key、role、valid_scope、entry_point'),
+      p(model)+p(scopes)+p(scoring)+p(participants)+p(migration)+p(previous)+telemetry('student_analysis_view、analysis_scope_change、support_plan_open','student_token、term_id、activity_id、dimension_key、role、valid_scope、entry_point'),
       p(local)+p('班级年级参考、个人和月度样本不同，在导出打印静态计算说明中分别表达；页面计算问号及浮层统一移除。个人多维分析删除“较上一期变化以百分点展示”、两主体分项说明整段、“以评价记录为依据，支持人工复核”“示例建议·待教师确认”“与当前筛选范围一致”及底部【假设】评分规则整段；该精简仅改变可见文案，不改变统计、学校页面状态说明或评分与建议计算。建议仍是教育支持草案，不代表教师已确认或完成。'),
-      ol(['默认仅一个活动入口，无模板/类型分类；活动一级联动、一级下钻及范围恢复正确，二级无筛选入口。','页面无计算问号和计算浮层；报告导出打印的实际字段口径与结果一致。','复算一级范围内全部二级与主体结果、组织全集参考、跨期唯一匹配和未取整60%边界。','空名单、失效、无评价、部分评价无虚构结论；低分红色及同范围方案入口正确。','月曲线独立按月、空月断点；个人页指定变化、分项、辅助及【假设】评分说明均已删除，统计/学校页面状态说明保留。',modal])
+      ol(['默认仅一个活动入口，无模板/类型分类；活动一级联动及范围恢复正确，全部一级和指定一级均为二级数值行，二级无筛选入口。','页面无计算问号和计算浮层；报告导出打印的实际字段口径与二级结果一致。','复算一级范围内全部二级与主体结果、组织全集参考、跨期唯一匹配和未取整60%边界。','空名单、失效、无评价、部分评价无虚构结论；低分红色及同范围方案入口正确。','月曲线独立按月、空月断点；个人页指定变化、分项、辅助及【假设】评分说明均已删除，统计/学校页面状态说明保留。',modal])
     ]),
     'students-analytics':page('学生统计分析 · 群体分析页PRD',[
       p('对筛选学生开展基础数据与单个活动评价分析，支持班级/年级横比、月度成长、低分预警、图文统计报告和个体培养建议。基础人口与有效评价样本分开统计。'),
@@ -3574,7 +3631,7 @@
       table([
         ['筛选','唯一活动入口','顶部表单只提供一个评价活动入口，默认五育评价；分析区不重复活动选择。切活动重置一级；组织/关键词提交后生效，二级条件固定all。','P0','范围遵循标准scope，内部模板隐藏。'],
         ['基础数据','人口统计','人数、班级分布、性别、年龄结构取全部命中学生，年龄以学期结束日周岁计算。','P0','不因缺评价或参与名单缩小人口分布。'],
-        ['评价表现','两级指标与静态口径','展示当前活动指标得分率、达标率、变化、班均、年均和人数；页面计算问号与浮层移除，静态说明仅用于报告导出打印。','P0','行内班均年均取命中学生所属组织全集。'],
+        ['评价表现','一级分组二级行','群体主分析九列表与独立“综合评价表现”表均以一级rowspan分组、所属二级逐行展示数值，不列一级汇总数值行；独立表保留原得分率、达标率、有效人数并增加二级指标列。','P0','行内班均年均取命中学生所属组织全集；独立表维持原业务指标。'],
         ['横向对比','班级/年级','按当前筛选人群分班级或年级计算同活动同指标同主体均值、达标率和有效人数；明确样本及比较数据。','P0','与行内组织全集参考口径不同。'],
         ['成长画像','月度趋势',monthly,'P0','当前活动、一级与主体生效，二级条件固定all。'],
         ['主体分项','教师/家长学生','固定两分项分别取教师、家长/学生，覆盖当前主体筛选，其余条件相同。','P0','不再列四个独立角色。'],
@@ -3599,7 +3656,7 @@
         ['第三部分','参与分母','显式名单与全校交集且去重，未配置默认全校；缺少=应评−有效，未参与不计缺口。','P0','空名单应评0，不生成比率。'],
         ['第三部分','活动雷达','轴按活动，保留本学期/上学期均值。每8活动一组，长名编号对应表格；不足3轴保留点和轴，不伪造面积。','P0','历史只按previousScope唯一映射，不可比值留空。'],
         ['专项分析','范围隔离','第四、第五、第七部分使用school scope的单活动、一级与主体，二级条件固定all；第三部分各活动和第六部分完整目录独立，不被专项缩小。','P0','各活动独立计算。'],
-        ['完整目录','三级目录表','动态遍历活动及firstLevelKeys下二级指标，表头评价活动、一级指标、二级指标。默认15一级35二级。','P0','配置变化后不硬编码条数。'],
+        ['完整目录','三级目录与二级结果','动态遍历活动及firstLevelKeys下二级指标，保留评价活动、一级指标、二级指标三项归属字段，以及得分率、达标率、有评价/应评价人数、缺少评价人数、覆盖率五个原数值字段，每行对应一个二级指标；屏幕及HTML按活动与一级rowspan分组并垂直居中，打印每行重复活动和一级名称。默认15一级35二级。','P0','不设置行内分析操作列；分组键含activityId及dimensionKey，配置变化后不硬编码条数。'],
         ['教育建议','匿名汇总','仅呈现去重预警人数、二级项数、一级缺口和课程资源建议，不输出学生身份、个人证据或方案按钮。','P0','低分与缺失分开。'],
         ['输出','完整HTML打印','共用当前学期和专项范围，展开完整目录，保留各活动、雷达、图例、静态解释，隐藏操作与PRD。','P1','长表允许分页，不裁行列。']
       ]),
@@ -3649,6 +3706,26 @@
       p(local)+p('建议不推断心理疾病或固定能力；目标需教师结合实际确认。当前没有确认、指派、完成和提醒能力，因此不设置相应成功事件。'),
       ol(['所有入口复制活动、一级及主体，内部二级条件固定all；学校无个体方案入口。','阈值与目标公式、并列优势、无低分高分保留、无数据及部分评价正确；模板文档不改变运行结果。','第五节仅“评价活动”“活动时间”两字段，名称及起止日期与目录一致；旧“评价依据与方案口径”、本节两级指标和实际评价周期不再展示。','未参加或失效只显示相应活动信息状态；参加但无评价仍显示配置，历史与旧活动ID解析正确。','页面、HTML、打印目标行动角色跟踪一致，PRD不入输出；模板文档35项二级、15项一级、完整示例及实现状态齐全。',modal])
     ])
+  });
+  // The secondary-result table contract applies to every embedded activity analysis.
+  // Summary, graph and business-record tables retain their existing sources and rows.
+  const secondaryTablePages=['student-analysis','students-analytics','school-report','stats-report','student-report'];
+  const secondaryTable='活动指标结果表统一为一级指标分组、二级指标数值行。全部一级显示当前活动全部配置二级指标；指定一级仅显示该一级全部配置二级指标。屏幕与HTML导出以一级名称rowspan合并对应二级行，合并单元格垂直居中；学校完整目录的活动合并单元格同样垂直居中。一级不再输出独立数值行；一级及二级名称均为纯文本，不保留分析列、查看指标按钮或名称点击。主分析表固定九列：一级指标、二级指标、得分率、达标率、较上一期、班级均值、年级均值、有效人数、评价证据。保留现有活动、一级及主体筛选，不新增二级筛选。';
+  const secondaryRows='行与排序完全读取所选活动firstLevelKeys及所属indicators配置，默认五育/综合素养/行为/个性化发展分别13/11/6/5行；数量随配置增删、排序与一级选择动态变化。一级分组身份为activityId+dimensionKey，二级行使用稳定indicatorKey或指标ID，不按显示名称合并；跨活动同名一级分开。无记录的已配置二级仍保留名称，本范围无样本时得分率、达标率为—，有效人数与有效评价证据数为0；变化与组织均值按各自范围的可用样本判断，缺失不补零。';
+  const secondaryFormula='每行内部计算范围覆盖为该活动、父级dimensionKey、稳定indicatorKey、学期及已应用主体，仅用于逐行取数，不写回界面筛选。个人二级rawScore为该项有效记录score/maxScore×100的等权均值；二级有效人数为该项可计算结果的去重参与学生数，群体二级得分率为这些个人二级结果等权均值；二级达标率=该项未取整个人结果≥60%人数÷该项有效人数。个人页面同样按该项样本计算，不能套用父级或全活动完整人数；父级不完整时已有二级仍独立有效。评价证据为该二级同范围有效且可计算的评分记录条数，不是原始查询条数。班级/年级均值按该二级同活动同主体在相应组织全集独立计算；较上一期按同一稳定二级指标及previousScope唯一映射分别计算两期样本，差值为未取整得分率之差。无样本或不可比显示—；显示一位小数，59.96%显示60.0%仍未达标，60%达标。';
+  const secondaryOutput='屏幕和HTML保留rowspan分组及全部二级行，合并单元格垂直居中；打印取消跨页合并，并在每条二级行重复一级名称，带评价活动列的完整目录同时逐行重复活动名称，保证分页后归属清楚。学校完整目录保留活动、一级、二级三项归属字段，以及得分率、达标率、有评价/应评价人数、缺少评价人数、覆盖率五个原数值字段，不设置行内分析操作列；独立综合评价表现表保留原业务指标并增加一级、二级分列，不扩展为主分析九列。静态计算附录必须取二级行口径元数据与该行真实scope，说明二级均值、该项有效人数、达标率、组织参考、有效证据和历史差值；学校目录另说明该项应评价参与人数、缺少=应评−该项有效人数、覆盖率=该项有效人数÷应评人数，无分母为—。不能复用一级/全活动完整性公式。页面不恢复计算问号。';
+  const secondaryBoundary='本合同覆盖个人多维分析、群体主分析、独立综合评价表现、学校专项、学校完整目录、统计报告及学生/教师/家长三角色报告第五部分嵌入分析。个人报告雷达旁固定五育快照表为明确例外，保留一级数值行及原快照口径。图表、趋势、摘要、评语、教师业务、学生名单、人口分布和学校活动汇总表保持原结构及算法；已有二级粒度的支持建议、证据和培养方案业务表保留业务行结构。概览“查看全部一级指标”导航及一级筛选保留。';
+  secondaryTablePages.forEach(id=>{
+    const doc=global.GrowthPagePRD.pages[id];
+    doc.sections[0].html+=p('V2.4将活动指标结果表统一为一级分组与二级数值行，直接呈现完整二级事实，不调整既有评分、图表及总体摘要。');
+    doc.sections[2].html+=p(secondaryBoundary);
+    const row=['指标结果表','一级分组与二级数值行',secondaryTable,'P0','默认配置13/11/6/5行；父级不完整不屏蔽有效二级。'];
+    doc.sections[3].html=doc.sections[3].html.replace('</tbody>','<tr>'+row.map(s=>'<td>'+s+'</td>').join('')+'</tr></tbody>');
+    doc.sections[4].html+=p(secondaryTable)+p(secondaryRows)+p(secondaryOutput);
+    doc.sections[5].html+=p('配置二级无记录、部分记录、有效0分、同名一级跨活动、仅一个二级、目录增删或排序均按稳定键保留正确行归属；父级或活动综合为空不隐藏该项有效二级值。一级无配置二级时保留目录异常状态，不伪造二级行或一级数值行。');
+    doc.sections[6].html+=p(secondaryFormula)+p('行粒度口径元数据须包含真实activityId、dimensionKey、indicatorKey、role和样本来源，HTML/打印附录按口径与行范围去重；原有隐藏元数据继续服务静态输出。');
+    doc.sections[7].html+=p(secondaryBoundary);
+    doc.sections[8].html+=ol(['默认四活动依次13/11/6/5条二级行；指定一级仅保留其所属二级，动态目录增删排序即时生效。主分析九列表头与合同逐字一致。','一级只作rowspan分组；无一级数值行、分析列、查看指标按钮或可点击指标名称；一级筛选和概览导航正常。','逐二级核对得分、达标、变化、组织参考、有效人数和有效证据；父级不完整仍展示已有有效二级，无记录行保留且缺失不补0。','屏幕及HTML分组正确，打印每行重复一级名称，完整目录同时重复评价活动名；长表分页无归属丢失。输出仅一个静态计算附录，所有二级字段使用该项真实口径。','个人报告雷达旁固定五育快照表保持例外；图表、趋势、摘要、评语、教师、名单、人口、活动汇总及既有支持/证据/方案业务行结构回归一致。']);
   });
   // Each student page retains its specific nine-section PRD. Calculation explanations
   // are static export/print requirements; business pages have no calculation controls.
@@ -4070,7 +4147,7 @@
       ${UI.render({studentIds:ids,term:state.filters.term,scope,context:'group',supportExpanded:!!state.supportExpanded.group})}
       <div class="ga-grid">
         ${panel('学生基础分布',`<div class="ga-section-title">班级分布${hint('studentDistribution')}</div>${bars(st.byClass,'人','total')}<div class="ga-grid ga-basic-sub"><div><div class="ga-section-title">性别比例${hint('studentDistribution')}</div>${bars(st.sex)}</div><div><div class="ga-section-title">年龄结构${hint('studentAge')}</div>${bars(st.ages)}</div></div>`)}
-        ${panel('综合评价表现',`<div class="ga-table-wrap"><table class="ga-table" aria-label="综合评价得分率和达标率"><thead><tr><th>一级指标</th><th>得分率${hint('score')}</th><th>达标率${hint('passRate')}</th><th>有效人数${hint('count')}</th></tr></thead><tbody>${result.dimensions.map(d=>`<tr><td>${esc(d.name)}</td><td><div class="ga-inline-bar"><span style="width:${Number(d.score)||0}%"></span></div>${pct(d.score)}</td><td>${pct(d.passRate)}</td><td>${d.count}</td></tr>`).join('')}</tbody></table></div><p class="ga-note">评价得分达到满分的60%即达标；无评价数据不记零分，按当前所选活动、一级指标及主体统计，包含所属全部二级指标。</p>`)}
+        ${panel('综合评价表现',UI.renderSecondaryPerformance({studentIds:ids,term:state.filters.term,scope})+`<p class="ga-note">各行按当前所选活动、一级指标及评价主体独立统计二级指标。评价得分达到满分的60%即达标；无评价数据不记零分，有效人数不跨行相加。</p>`)}
         ${panel('活动月度成长趋势',UI.renderTrend({studentIds:ids,term:state.filters.term,scope:trendScope,context:'group'}),metricSelect(result.dimensions))}
         ${panel('横向对比'+hint('studentClassComparison'),`<p class="ga-note ga-comparison-note">柱形图对比各${state.compare==='class'?'班级':'年级'}在所选活动中的评价得分率，下表显示有效人数与达标率。各组使用相同的活动、一级指标和评价主体口径，包含所属全部二级指标。</p>`+bars(groups,'%','overall',100)+`<div class="ga-table-wrap"><table class="ga-table" aria-label="当前活动横向对比"><thead><tr><th>${state.compare==='class'?'班级':'年级'}</th><th>有效人数/总人数${hint('studentCompleteCount')}${hint('studentPopulation')}</th><th>达标率${hint('passRate')}</th></tr></thead><tbody>${groups.map(g=>`<tr><td>${esc(g.name)}</td><td>${g.evaluated}/${g.total}</td><td>${pct(g.passRate)}</td></tr>`).join('')}</tbody></table></div>`,`<select id="ga-compare" aria-label="横向对比范围"><option value="class" ${state.compare==='class'?'selected':''}>班级对比</option><option value="grade" ${state.compare==='grade'?'selected':''}>年级对比</option></select>`)}
       </div><p class="ga-note">得分率＝实际得分÷该项满分×100%；得分率≥60%即达标。达标率＝达标有效人数÷有效人数×100%，缺失评价不计零分。</p>`;
@@ -4226,7 +4303,6 @@
     else if(a==='print-school'){render();root.querySelectorAll('#ga-school-report-preview details').forEach(n=>n.open=true);window.GrowthHints.preparePrint();window.print();}
     else if(a==='school-report'){state.studentId=null;state.view='school';state.schoolTerm=state.filters.term;state.scopes.school=retermScope(state.scopes.school,state.schoolTerm);render();}
     else if(a==='open-analysis'){state.studentId=b.dataset.id||state.studentId;state.detail='analysis';state.scopes.personal=UI.normalizeStudentScope({...emptyScope(state.filters.term),...(b.dataset.activity?{activityId:b.dataset.activity}:{}),dimensionKey:b.dataset.dimension||'all',indicatorKey:'all',role:'all'},state.filters.term);render();}
-    else if(a==='scope-dimension'){const scope=scopeFor(b.dataset.context);state.supportExpanded[b.dataset.context]=false;scope.dimensionKey=b.dataset.dimension;scope.indicatorKey='all';render();}
     else if(a==='school-open-scope'){state.scopes.school={...emptyScope(state.schoolTerm,b.dataset.system),dimensionKey:b.dataset.dimension};render();root.querySelector('[data-analysis-context="school"]')?.scrollIntoView({block:'start'});}
     else if(a==='print'){state.detail='report';render();window.GrowthHints.preparePrint();window.print();}
     else if(a==='ai-query')notify('请进入学生成长档案查看统计与个人报告');
