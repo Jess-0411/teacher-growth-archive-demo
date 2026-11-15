@@ -1137,6 +1137,24 @@
   #ga-root.tg-teacher-mode .tg-report .ga-link { color: #606a76; text-decoration: none; }
 }
 
+
+#ga-root .tg-prd-section .tg-template-guide-table { table-layout: fixed; }
+#ga-root .tg-template-guide-table th:nth-child(1) { width: 12%; }
+#ga-root .tg-template-guide-table th:nth-child(2) { width: 16%; }
+#ga-root .tg-template-guide-table th:nth-child(3) { width: 22%; }
+#ga-root .tg-template-guide-table th:nth-child(4) { width: 22%; }
+#ga-root .tg-template-guide-table th:nth-child(5) { width: 28%; }
+
+/* Keep the five documentation fields readable on narrow screens. */
+@media (max-width: 1000px) {
+  #ga-root .tg-prd-section .tg-template-guide-table { min-width: 0; display: block; }
+  #ga-root .tg-template-guide-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  #ga-root .tg-template-guide-table tbody, #ga-root .tg-template-guide-table tr { display: block; width: 100%; }
+  #ga-root .tg-template-guide-table tr { border: 1px solid #e6ece9; margin-bottom: 12px; }
+  #ga-root .tg-prd-section .tg-template-guide-table td { display: block; border: 0; border-bottom: 1px solid #edf0f3; }
+  #ga-root .tg-template-guide-table td::before { content: attr(data-label); display: block; margin-bottom: 4px; color: #52635d; font-weight: 600; }
+  #ga-root .tg-template-guide-table td:last-child { border-bottom: 0; }
+}
 </style>
 <div id="ga-root" lang="zh-CN">
   <div class="ga-shell">
@@ -4435,6 +4453,7 @@ window.TeacherReportConfig = {autoOpen: false};
 window.TeacherReportPRD = {
   "version": "V0.8",
   "updatedAt": "2026-11-14",
+  "documentationUpdatedAt": "2026-11-15",
   "pages": {
     "personal": {
       "title": "个人报告",
@@ -4521,25 +4540,94 @@ window.TeacherReportPRD = {
   }
 };
 
-/* 模板正文和词库直接取运行时配置；两份页内PRD共用同一确定性数据源。 */
+/* 开发说明使用独立演示数据调用原模板；不改模板正文、变量或业务查询。 */
 (function () {
   'use strict';
   const escape = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const table = (headers, rows) => '<div class="tg-table-wrap"><table><thead><tr>' + headers.map(label => '<th>' + escape(label) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + row.map(value => '<td>' + escape(value) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+  const table = (headers, rows, kind = '') => '<div class="tg-table-wrap"><table' + (kind ? ' class="tg-template-guide-table" aria-label="' + escape(kind) + '"' : '') + '><thead><tr>' + headers.map(label => '<th>' + escape(label) + '</th>').join('') + '</tr></thead><tbody>' + rows.map(row => '<tr>' + row.map((value, index) => '<td' + (kind ? ' data-label="' + escape(headers[index]) + '"' : '') + '>' + escape(value).replace(/\n/g, '<br>') + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
   const source = window.TeacherDiagnosis;
-  let content = '<h4>四类诊断文案完整映射</h4><p>诊断仅比较当前报告内一级指标下的二级指标；个人纳入可计算项，团队每项至少2名有效教师。使用未取整值判定最高、最低及并列，显示一位小数；并列按指标顺序完整展示。</p><p>匹配顺序：EMPTY → 团队SAMPLE → SINGLE → BALANCED → 正常相对结果；PARTIAL作为附加说明，不覆盖基础模板。各页面保留本模式两类固定栏目，开发可在此查阅全部四类。</p>';
+  const aliases = [
+    { keys: ['结果列表'], label: '【选中的二级指标名称及得分率】', from: '取本类选中的二级指标名称和得分率；团队逐项增加该指标有效教师人数。', example: '个人：课堂互动情况（60.0%）；团队：课堂互动情况（60.0%，有效教师3人）。' },
+    { keys: ['主题列表', '主题'], label: '【建议关注的内容】', from: '用评价活动ID＋一级指标ID＋二级指标ID查预配置词库，读取theme。', example: '课堂互动情况 → 课堂提问与互动。单项和多项含义相同。' },
+    { keys: ['行动列表'], label: '【各指标对应的改进建议】', from: '按相同ID组合读取action；每条前面加上对应的二级指标名称。', example: '针对“课堂互动情况”优化提问、讨论及反馈环节。' },
+    { keys: ['证据列表', '证据'], label: '【建议用于跟踪的材料】', from: '按相同ID组合读取evidence，只读取配置文字，不查询已上传附件。', example: '课堂互动情况 → 互动观察记录与学生反馈。表示建议使用的材料，不表示材料已经存在。' }
+  ];
+  const aliasMap = new Map(aliases.flatMap(alias => alias.keys.map(key => [key, alias.label])));
+  const readable = body => body.replace(/\{([^}]+)\}/g, (token, key) => aliasMap.get(key) || token);
+  const steps = [
+    '只看报告内当前所选一级指标下的二级指标。先找出能计算得分率的指标；有效0%也保留，缺少结果的指标不补0。',
+    '个人直接使用上述结果。团队再检查每个指标的有效教师人数，只把至少2人的指标放入相对比较；不足2人的原始结果仍保留在分项表。',
+    '按顺序判断：没有可计算结果 → EMPTY；团队有结果但每项人数都不足2人 → SAMPLE；只剩1项 → SINGLE；至少2项且未取整结果全部相同 → BALANCED；其余情况才比较最高和最低。',
+    '相对优势选最高项；个人提升、团队教研与培训选最低项。比较使用未取整结果，最高或最低并列的指标全部选中，按指标配置顺序排列。',
+    '按选中指标的ID读取预配置建议，填入固定句子。名称改了仍按ID找配置，不根据名称关键词猜测内容。',
+    '至少有1项进入比较、但没有覆盖当前一级下全部配置指标时，在基础文案最后追加PARTIAL说明。只有追加，不替换基础文案。'
+  ];
+  const rules = [
+    '得分率显示一位小数。80.01%与80.04%都会显示80.0%，但不算并列；判断时仍比较80.01和80.04。',
+    '多项指标结果用“、”连接，不合并指标；团队每项显示自己的有效教师人数。',
+    '建议关注内容和跟踪材料：按完整配置文字去重，保留第一次出现的顺序，再用“、”连接。“教案与课堂观察记录”是一整条配置，不拆开去重。',
+    '改进建议：每项保留“针对‘二级指标名称’”前缀，不去重，多项用“；”连接，避免建议与指标错配。',
+    '建议用于跟踪的材料来自预配置词库，不表示附件已上传，不表示已核验材料，也不表示改进行动已经完成。',
+    '需要逐项对应时，读取matchedItems中每个指标自己的action配置；不要按汇总文字的位置反推指标。',
+    '找不到该ID组合的建议配置时，使用现有通用内容：关注“该二级指标”；行动“制定一项阶段实践任务并复盘”；材料“实践记录与评价反馈”。'
+  ];
+  const traces = [
+    ['templateId／partialTemplateId', '基础文案编号／追加说明编号。PARTIAL追加在基础文案后面，不是替换基础文案。'],
+    ['matchedItems', '本类选中的指标；包含活动、一级、二级ID、名称、未取整得分率、有效教师数和该指标自己的建议配置。'],
+    ['sourceRecordIds', '参与计算且能计算得分率的评分记录ID，用于追溯评分。它是记录ID，不是附件ID；不能用它直接当成附件地址。'],
+    ['附件／上传佐证', '通过团队现有记录与佐证入口查询并校验权限，不由建议材料名称生成；个人报告仍不新增佐证入口。']
+  ];
+  const scenarios = {
+    RELATIVE: { rates: [85, 75, 65, 60], counts: [3, 4, 3, 4], label: '演示数据：教学内容组织85.0%、教学方法运用75.0%、课堂互动情况65.0%、教学效果60.0%；团队各项有效教师依次为3、4、3、4人。' },
+    EMPTY: { rates: [null, null, null, null], counts: [0, 0, 0, 0], label: '演示数据：当前一级下4项二级指标均没有可计算得分率。' },
+    SAMPLE: { rates: [85, 75, 65, 60], counts: [1, 1, 1, 1], label: '演示数据：4项都有得分率，但每项只有1名有效教师，均未满足团队比较所需的2人。' },
+    SINGLE: { rates: [70], counts: [3], label: '演示数据：当前一级仅配置“教学内容组织”1项，得分率70.0%；团队该项有效教师3人。' },
+    BALANCED: { rates: [70, 70, 70, 70], counts: [3, 4, 3, 4], label: '演示数据：4项二级指标的未取整得分率均为70%，团队各项人数均不少于2人。' },
+    PARTIAL: { rates: [85, null, 60, null], counts: [3, 0, 4, 0], label: '演示数据：当前一级配置4项，教学内容组织85.0%、课堂互动情况60.0%，其余2项无结果；团队这两项有效教师分别3人、4人。' },
+    TIED: { rates: [85, 85, 60, 60], counts: [3, 4, 3, 4], label: '演示数据：教学内容组织与教学方法运用均为85%，课堂互动情况与教学效果均为60%；这些未取整结果确实相同。团队有效教师依次为3、4、3、4人。' }
+  };
+  let content = '<h4>四类诊断模板：开发怎么实现</h4><p>业务版本V0.8；说明修订：2026-11-15。本次只解释实现方式，报告实际文案、计算、模板编号和代码变量键保持原样。以下示例均为独立演示数据，不是当前教师或团队的实际结论；完整文案由现有模板程序生成。</p>';
   if (source) {
-    source.categories.forEach(category => {
-      content += '<h4>' + (category.mode === 'personal' ? '个人' : '团队') + escape(category.title) + '</h4>' + table(['模板编号','匹配条件','展示文案'], source.templates.filter(template => template.category === category.category).map(template => [template.templateId,template.condition,template.body]));
+    const configuredItems = window.TeacherDemo.areas.find(area => area.id === 'classroom').items;
+    const fixture = scenario => ({ activityId: 'DEMO-TEACHER-2026', areas: [{ id: 'classroom', name: '课堂教学', items: scenario.rates.map((scoreRate, index) => ({ id: configuredItems[index].id, name: configuredItems[index].name, scoreRate, n: scenario.counts[index] })) }], records: [] });
+    const resultFor = (category, scenario) => source.build({ data: fixture(scenario), areaId: 'classroom', mode: category.mode }).find(result => result.category === category.category);
+    const contextFor = (category, scenario) => category.mode === 'personal' ? scenario.label.replace(/[；，。]团队.*$/, '。') : scenario.label;
+    const condition = (category, status) => ({
+      RELATIVE: '至少有2项能参加比较，且结果不全相同。' + (category.mode === 'team' ? '每项有效教师均不少于2人。' : '') + '选择得分率' + (category.direction === 'high' ? '最高' : '最低') + '的指标，并列全部保留。',
+      EMPTY: '当前一级下没有任何二级指标能计算得分率。',
+      SAMPLE: '仅团队使用：有可计算结果，但所有指标的有效教师人数都不足2人。',
+      SINGLE: '只有1项能参加比较。' + (category.mode === 'team' ? '这1项的有效教师人数须不少于2人。' : ''),
+      BALANCED: '至少2项能参加比较，且未取整的得分率全部相同。',
+      PARTIAL: '至少1项能参加比较，但数量少于当前一级下配置的二级指标总数。团队因人数不足被排除的指标也算未覆盖。'
+    })[status];
+    const instruction = (category, status) => ({
+      RELATIVE: '1.选出' + (category.direction === 'high' ? '最高' : '最低') + '项及全部并列项。2.读取这些指标的名称、得分率' + (category.mode === 'team' ? '和各自有效教师人数' : '') + '。3.按ID取关注内容、改进建议、跟踪材料，按下表占位名称填入句子。',
+      EMPTY: '直接显示固定提示，不填指标、建议或材料，不生成优势或提升结论。',
+      SAMPLE: '直接显示固定提示。已有结果继续放在分项表中，不因为人数不足而删除数据，也不生成团队结论。',
+      SINGLE: '读取这一项的名称、得分率及预配置关注内容和跟踪材料；填入单项文案，不把它同时判为优势和短板。若仍有其他配置项未覆盖，另外追加PARTIAL。',
+      BALANCED: '直接显示固定提示，不挑最高或最低项。若仍有其他配置项未覆盖，另外追加PARTIAL。',
+      PARTIAL: '先按正常／单项／均衡规则生成基础文案，再把本行固定说明追加在末尾。右侧示例展示“基础文案＋追加说明”，不要用本行替换整段。'
+    })[status];
+    const categories = source.categories.map(category => ({
+      category: category.category,
+      title: (category.mode === 'personal' ? '个人' : '团队') + category.title,
+      rows: source.templates.filter(template => template.category === category.category).map(template => {
+        const scenario = scenarios[template.status], result = resultFor(category, scenario);
+        return { templateId: template.templateId, status: template.status, when: condition(category, template.status), how: instruction(category, template.status), format: readable(template.body), exampleContext: contextFor(category, scenario), example: result.body, fixture: scenario, baseTemplateId: result.templateId, partialTemplateId: result.partialTemplateId };
+      })
+    }));
+    const extraExamples = source.categories.map(category => ({ category: category.category, title: (category.mode === 'personal' ? '个人' : '团队') + category.title, context: scenarios.TIED.label, example: resultFor(category, scenarios.TIED).body, fixture: scenarios.TIED }));
+    const guide = { revision: '2026-11-15', version: 'V0.8', headers: ['模板编号','什么时候使用','开发需要做什么','文案格式','完整展示示例'], aliases, steps, rules, traces, categories, extraExamples, actions: source.actions };
+    window.TeacherReportPRD.templateGuide = guide;
+    content += '<h4>先按这6步处理</h4><ol>' + steps.map(step => '<li>' + escape(step) + '</li>').join('') + '</ol>';
+    content += '<h4>方括号里需要填什么</h4>' + table(['实际代码键（不改）','文档显示名称','数据从哪里取','替换示例'], aliases.map(alias => [alias.keys.join('／'), alias.label, alias.from, alias.example]));
+    categories.forEach(category => {
+      content += '<h4>' + escape(category.title) + '</h4>' + table(guide.headers, category.rows.map(row => [row.templateId, row.when, row.how, row.format, row.exampleContext + '\n最终显示：' + row.example]), category.title + '开发模板');
     });
-    content += '<h4>变量与追溯</h4>' + table(['变量','替换规则'], [
-      ['结果列表','逐项输出命中二级指标名称与得分率；团队逐项追加有效教师数，不合并不同样本。'],
-      ['主题列表、行动列表、证据列表','按命中顺序读取稳定三级标识词库并连接；不按名称关键词匹配。'],
-      ['主题、证据','单项模板读取该指标词库内容。'],
-      ['匹配追溯','返回模板ID、命中指标稳定标识、原始精度得分率、样本及依据记录ID。']
-    ]);
-    content += '<h4>二级指标行动词库</h4><p>完整关联键为评价活动ID＋一级指标ID＋二级指标ID，改名不改变命中；其他活动不得凭同名自动套用。</p>' + table(['评价活动ID','一级／二级标识','二级指标','主题','建议行动','证据'], source.actions.map(action => [action.activityId,action.areaId + '/' + action.itemId,action.name,action.theme,action.action,action.evidence]));
-    content += '<p>未知配置使用通用主题“该二级指标”、行动“制定一项阶段实践任务并复盘”、证据“实践记录与评价反馈”。词库不将得分率解释为实际学时、次数、证书等级、获奖等级或师德风险。</p>';
+    content += '<h4>并列时的完整示例</h4><p>' + escape(scenarios.TIED.label) + '</p>' + table(['分类','最终显示示例'], extraExamples.map(example => [example.title, example.example]));
+    content += '<h4>多项怎么拼接、材料表示什么</h4><ul>' + rules.map(rule => '<li>' + escape(rule) + '</li>').join('') + '</ul>';
+    content += '<h4>二级指标建议配置</h4><p>完整关联键为评价活动ID＋一级指标ID＋二级指标ID；示例活动ID为DEMO-TEACHER-2026。下面括号内保留一级／二级ID方便开发关联，实际文案显示指标名称。theme、action、evidence分别对应关注内容、具体做法、跟踪材料。得分率不表示实际学时、次数、证书等级、获奖等级或师德风险。</p>' + table(['二级指标','建议关注什么','建议具体做什么','建议用什么材料跟踪'], source.actions.map(action => [action.name + '（' + action.areaId + '/' + action.itemId + '）',action.theme,action.action,action.evidence]));
+    content += '<h4>评分记录与附件如何区分</h4>' + table(['字段／内容','开发解释'], traces);
   } else content += '<p>诊断模板资源未加载，请核对teacher-templates.js装配；不得从显示名称推断或静默生成替代文案。</p>';
   Object.values(window.TeacherReportPRD.pages).forEach(page => { page.sections[4].html = page.sections[4].html.replace('<!--TEACHER_TEMPLATE_TABLES-->', content); });
 })();
