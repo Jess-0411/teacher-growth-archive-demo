@@ -585,6 +585,10 @@
 #ga-root .ga-support-plan-meta { display: flex; flex-wrap: wrap; gap: 7px 22px; padding-top: 18px; color: #606266; }
 #ga-root .ga-support-plan-intro { margin: 14px 0 0; line-height: 1.9; color: #303133; }
 #ga-root .ga-support-plan-range { overflow-wrap: anywhere; }
+#ga-root .ga-support-plan .ga-plan-activity-table-wrap { margin: 0; }
+#ga-root .ga-support-plan .ga-table.ga-plan-activity-table { min-width: 0; table-layout: fixed; }
+#ga-root .ga-plan-activity-table th:first-child { width: 40%; }
+#ga-root .ga-plan-activity-table th, #ga-root .ga-plan-activity-table td { white-space: normal; overflow-wrap: anywhere; line-height: 1.85; }
 #ga-root .ga-support-draft { color: #b88230; }
 #ga-root .ga-support-draft-note { margin: 8px 0 0; line-height: 1.9; color: #909399; font-size: 11px; }
 #ga-root .ga-support-strength-list { margin-bottom: 0; }
@@ -628,6 +632,8 @@
   #ga-root .ga-support-plan .ga-table.ga-support-review-table { width: 100%; min-width: 0; table-layout: auto; font-size: 9px; }
   #ga-root .ga-support-plan .ga-table.ga-support-plan-table { table-layout: fixed; font-size: 10px; }
   #ga-root .ga-support-plan-table thead { display: table-header-group; }
+  #ga-root .ga-plan-activity-table thead { display: table-header-group; }
+  #ga-root .ga-plan-activity-table tr { break-inside: avoid; page-break-inside: avoid; }
   #ga-root .ga-support-plan-table tr { break-inside: avoid; page-break-inside: avoid; }
   #ga-root .ga-support-plan-table th:nth-child(1) { width: 12%; }
   #ga-root .ga-support-plan-table th:nth-child(2) { width: 10%; }
@@ -3243,6 +3249,16 @@
       return '<tr><td>' + esc(priority.dimensionName) + '<small class="ga-support-subtext">' + esc(priority.indicatorName) + '</small></td><td><strong class="' + flag.className + '">' + alertScore(priority) + '</strong><small class="ga-support-subtext">' + esc(flag.label) + '</small>' + (!priority._maintenance ? '<small class="ga-support-subtext">' + esc(change(priority.change)) + '</small>' : '') + '</td><td>' + esc(goal) + '</td><td>' + esc(activity) + '</td><td>' + esc(owner) + '<small class="ga-support-subtext">' + esc(cycle) + '</small></td><td>' + esc(measure) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   }
+  function planActivityInfo(studentId, termId) {
+    const demo = global.GrowthDemo;
+    if (!demo || !array(demo.students).some(student => student.id === studentId)) return empty('未找到对应学生，无法查看参与活动信息。');
+    if (!array(demo.terms).some(term => term.id === termId)) return empty('当前方案学期已失效，请重新选择。');
+    const activities = global.GrowthPersonalTracking.getActivities(studentId,termId);
+    if (!activities.length) return empty('当前学生在所选学期暂无参与的评价活动');
+    return '<div class="ga-table-wrap ga-plan-activity-table-wrap"><table class="ga-table ga-plan-activity-table" aria-label="培养方案参与评价活动"><thead><tr><th>评价活动</th><th>活动时间</th></tr></thead><tbody>' + activities.map(activity =>
+      '<tr data-activity-id="' + esc(activity.id) + '"><td>' + esc(activity.name) + '</td><td>' + esc(text(activity.startDate) || '—') + ' 至 ' + esc(text(activity.endDate) || '—') + '</td></tr>'
+    ).join('') + '</tbody></table></div>';
+  }
   function renderPlan(options) {
     if (!service() || !service().getPlan) return empty('培养方案尚未准备完成');
     const opts = Object.assign({}, options, {scope:studentScope(options && options.scope, options && options.term)});
@@ -3263,13 +3279,7 @@
       ? '<ul class="ga-support-strength-list">' + strengths.map(item=>'<li><strong>' + esc(item.dimensionName) + ' · ' + esc(item.indicatorName) + ' ' + pct(item.score) + help('studentStrengths') + '</strong><p>' + esc(item.basis || '依据本期该二级指标有效评价记录。') + help('studentEffectiveRecords') + '</p></li>').join('') + '</ul>'
       : '<p>' + (hasEvidence ? '当前范围暂无已达标优势项，已有评价与待提升项见下方。' : '当前范围暂无足够评价数据，先核对并补齐评价记录。') + '</p>';
     const weekTable = weeks.length ? '<div class="ga-table-wrap ga-support-table-wrap"><table class="ga-table ga-support-review-table" aria-label="建议跟踪与复核周期"><thead><tr><th>建议周次' + help('studentReviewCycle') + '</th><th>建议安排</th><th>留存证据</th></tr></thead><tbody>' + weeks.map(item=>'<tr><td>' + esc(typeof item.week === 'number' ? '基准后第' + item.week + '周' : text(item.week)) + '</td><td>' + esc(text(item.action)) + '</td><td>' + esc(text(item.evidence)) + '</td></tr>').join('') + '</tbody></table></div>' : '';
-    const resolvedScope = global.GrowthDetail.resolveScope(plan.scope || opts.scope,termId);
-    const activity = resolvedScope.valid ? resolvedScope.activity : null;
-    const activityInfo = !activity
-      ? empty('当前评价范围已失效，请重新选择后查看活动信息。')
-      : plan.status === '未参加当前活动'
-        ? empty('当前学生未参加该评价活动，暂无参与活动信息。')
-        : '<p class="ga-support-plan-range"><strong>评价活动：</strong>' + esc(activity.name) + '</p><p><strong>活动时间：</strong>' + esc(activity.startDate) + ' 至 ' + esc(activity.endDate) + '</p>';
+    const activityInfo = planActivityInfo(opts.studentId,termId);
     return '<article class="ga-report ga-support-plan" data-calculation-scope="'+esc(calculationScope([opts.studentId],termId,plan.scope||opts.scope))+'" id="ga-plan-preview">' +
       '<header class="ga-report-head"><h2>学生个性化培养方案</h2><p>' + esc(titleForTerm(termId)) + ' · <span class="ga-support-draft">' + (historical ? '历史学期草案 · ' : '') + esc(plan.statusText || plan.status || '待确认草案') + '</span> <span class="ga-demo">示例数据</span></p></header>' +
       '<div class="ga-support-plan-meta"><span>学生：' + esc(plan.studentName) + '</span><span>班级：' + esc(plan.className || '') + '</span><span>评价数据截至：' + esc(basisDate) + '</span></div>' +
@@ -3460,8 +3470,8 @@
   const local='当前人员、目录、评分、曲线、评语、勋章与建议均为本地合成演示，未接入真实后端、AI、登录权限或执行通知。【假设】正式接口按学校与人员授权并由服务端复验范围、记录状态和版本。';
   const modal='右上角PRD按钮打开当前页专属九章只读弹窗，显示当前上下文；关闭后人员、学期、角色、筛选、页码与范围不变。支持键盘关闭及焦点返回；PRD按钮、弹窗及内容不进入业务导出或打印。';
   const telemetry=(events,fields)=>p('【假设】正式埋点：'+events+'；参数含page_id、is_demo、'+fields+'。使用稳定ID/脱敏标识，不采集姓名、学号、评语和关键词原文；当前无上报。');
-  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.4',updatedAt:'2026-11-15',pages:{}};
-  global.GrowthPagePRD.version='V2.4';
+  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.5',updatedAt:'2026-11-15',pages:{}};
+  global.GrowthPagePRD.version='V2.5';
   global.GrowthPagePRD.updatedAt='2026-11-15';
   Object.assign(global.GrowthPagePRD.pages,{
     'students-list':page('学生成长档案 · 学生名单页PRD',[
@@ -3599,8 +3609,8 @@
   const local='本地人员、目录、评分、趋势、证据和建议均为合成演示。未接入后台、权限、AI、通知、方案执行或真实干预服务。【假设】正式接口由服务端按学校及人员授权、校验记录与目录版本。';
   const modal='本页右上角PRD只读弹窗展示专属九章与当前上下文；关闭不改变筛选、范围、学期、人员、角色或页码。支持键盘关闭及焦点返回；PRD控件与内容不进入业务HTML导出或打印。';
   const telemetry=(events,fields)=>p('【假设】正式埋点：'+events+'；参数含page_id、is_demo、'+fields+'。不记录姓名、学号、搜索原文、评语或建议正文；人员ID脱敏，当前未上报。');
-  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.4',updatedAt:'2026-11-15',pages:{}};
-  global.GrowthPagePRD.version='V2.4';
+  global.GrowthPagePRD=global.GrowthPagePRD||{version:'V2.5',updatedAt:'2026-11-15',pages:{}};
+  global.GrowthPagePRD.version='V2.5';
   global.GrowthPagePRD.updatedAt='2026-11-15';
   Object.assign(global.GrowthPagePRD.pages,{
     'student-analysis':page('个人档案 · 多维分析页PRD',[
@@ -3685,26 +3695,26 @@
       ol(['生成参数与统计已应用条件一致，后续改筛选不改已有对象参数。','范围仅实际活动名称、无重复活动行，一级与主体独立字段，无二级筛选字段。','报告与同参数统计复算一致，非五育不显示伪五育雷达。','失效、缺数、空名单、历史不可比均正确；方案继承报告参数。','HTML和打印同范围且控件/PRD隐藏，曲线说明已精简。',modal])
     ]),
     'support-plan':page('个性化培养方案 · 目标与跟踪页PRD',[
-      p('根据个人有效二级指标生成教育支持草案，展示优势、阶段目标、行动、责任建议与跟踪复核；底部仅展示当前方案所选活动名称和配置起止时间，所有结论限定在来源活动和指标范围。'),
+      p('根据个人有效二级指标生成教育支持草案，展示优势、阶段目标、行动、责任建议与跟踪复核；第五节按方案学生和所选学期列表展示全部参与活动及配置时间，评价结论继续限定在原来源活动和指标范围。'),
       ul(['教师从个人分析、学生报告、群体预警或统计报告打开同范围方案。','核对基线与具体二级证据，明确行动、过程目标和责任角色。','家校协作参考草案，实际确认、实施及复核由真实业务记录承担。']),
-      scope(['学生、学期、scope上下文；相对优势、低分目标、行动、角色和跟踪表。','所选评价活动信息、HTML打印、失效与缺失状态、本页PRD及研发模板对照文档。'],['顶部摘要/分析范围/独立草案说明及计算假设列表。','将文档中待研发模板接入现有页面；真实确认、指派、通知、执行、复核写回或承诺4周达成。']),
+      scope(['学生、学期、scope上下文；相对优势、低分目标、行动、角色和跟踪表。','所选学期全部参与活动信息、HTML打印、失效与缺失状态、本页PRD及研发模板对照文档。'],['顶部摘要/分析范围/独立草案说明及计算假设列表。','将文档中待研发模板接入现有页面；真实确认、指派、通知、执行、复核写回或承诺4周达成。']),
       table([
         ['范围','来源继承','保存{studentId,term,scope}，复制来源实际活动、一级和主体，二级条件固定all；旧单项保存范围归一后重算，不保留隐藏单项条件。','P0','学校匿名汇总不提供本入口。'],
         ['优势','已达标相对最高','在当前有效二级指标中取≥60%相对最高项，全部并列；无达标项不虚构优势。','P0','缺数不判能力不足。'],
         ['低分支持','基线目标与建议','有效二级未取整<60%生成红色改进项，带基线、依据、行动、过程目标、责任角色和参考目标。','P0','【假设】目标min(60,round(raw+10,2))。'],
         ['已达标','巩固拓展','无低分时保留已有已达标基线作为巩固/拓展目标，不统一降至60%。','P0','目标不计入当前达标结果。'],
-        ['活动信息','当前方案活动','第五节标题为“五 评价活动信息”，仅展示评价活动名称与活动时间。按保存范围解析活动ID后读取目录name、startDate、endDate，不列其他活动或一级、二级字段。','P0','使用配置起止日期，与四周复核安排分开；未参加或失效显示对应状态。'],
+        ['活动信息','所选学期全部参与活动','第五节标题为“五 评价活动信息”，固定评价活动、活动时间两列。以方案studentId与term调用GrowthPersonalTracking.getActivities(studentId,term)，按目录顺序每活动一行，读取name、startDate、endDate，不受方案活动、一级及主体筛选限制。','P0','按活动ID识别，同名分别保留；历史方案查询对应历史学期，配置时间与四周复核安排分开。'],
         ['研发文档','固定模板对照表','《学生成长档案固定模板对照表.md》按分类列出条件、优先级、完整正文、变量、示例及已实现/待研发状态；本轮仅整理文档，不替换现有建议。','P1','35项二级配套和15项一级匿名资源建议完整列举。'],
         ['跟踪复核','行动与周期','保留培养目标、行动建议、责任角色、过程证据和4周表；第4周同范围复核。','P0','【假设】4周和责任角色建议，未实际执行。'],
         ['状态','缺数与失效','已有二级可形成对应建议，整体不完整保留提示；无有效数据不生成分数目标或周表；失效禁止借用其他范围。','P0','示例、历史、无数据状态继续展示。'],
         ['输出','同源HTML打印','复用页面渲染和来源上下文，保留目标行动与复核，移除控件及PRD。','P1','不恢复已删除的说明。'],
         ['页内PRD','方案上下文',modal,'P0','来源、学生、学期、活动、一级与主体，无独立二级筛选字段。']
       ]),
-      ol(['从允许的个人入口复制学生、学期与scope，统一解析并验证。','按有效二级计算优势和低分；已有项可独立建议，缺数单独提示。','展示目标、具体行动、责任角色及复核表；第五节仅读取该方案活动的目录名称和配置起止日期。','学生有参与资格但无有效评价时仍可显示活动信息；未参加或范围失效仅显示状态，不借用其他活动。','导出打印使用同一范围及渲染结果；返回不改变来源页选择，不触发真实执行。']),
-      ul(['空名单或学生不在显式名单：不生成评价分数结论或低分建议，第五节提示未参加当前活动。','失效活动、错属指标或未知主体显示失效；不能回退到其他活动。','0分有效且预警，59.96%预警，60%不预警；无数据不作0分。','全部达标仅巩固拓展，保留原高分；相对最高未达60%不列优势。','历史学期保留历史状态；活动时间读取该历史活动配置，四周复核不伪造实施结果。']),
-      p(model)+p(scoring)+p(participants)+p(migration)+p(previous)+p('GrowthSupport.getPlan({studentId,term,scope})复用相同分析。低分以个人二级rawScore<60判断；参考目标【假设】min(60,round(rawScore+10,2))，增加不超过10个百分点且不高于60%。无低分时基线保持当前rawScore。复核【假设】4周第4周；评价基准及计算范围继续使用现有规则。第五节经resolveScope解析plan.scope（含旧活动ID迁移），直接读取activity.name/startDate/endDate；不用plan.startDate/endDate、评价记录最早最晚日期或未来28天替代活动配置日期。目标、建议和责任仅为草案，不表示已确认或实施。')+p('研发文档《学生成长档案固定模板对照表.md》是独立模板目录，已实现状态以条件和正文在当前源码中实际匹配为准，待研发行尚未接入。现有建议、评分、预警、勋章和排名不因整理文档而改变。')+telemetry('support_plan_view、support_plan_back、support_plan_export/print','source_page、student_token、term_id、activity_id、dimension_key、role、data_status、target_count、format、result'),
+      ol(['从允许的个人入口复制学生、学期与scope，统一解析并验证；目标、建议、曲线与复核继续按该原范围计算。','按有效二级计算优势和低分；已有项可独立建议，缺数单独提示。','第五节独立以方案保存的studentId与term查询全部参与活动，按目录顺序渲染评价活动、活动时间两列表格，名称和时间直接来自目录。','原方案scope失效或未参加其所选活动时保留原状态；底部仍展示本人该学期其他合法参与活动，不通过清单覆盖方案结论。','导出打印复用同一活动清单和方案渲染结果；返回不改变来源页选择，不触发真实执行。']),
+      ul(['显式participantIds包含该生但无记录仍列活动；明确空名单或排除该生不列入；未配置名单时按本人该期已有原始活动记录认定，不要求有效得分。','原方案失效活动、错属指标或未知主体保持失效；底部清单独立于scope，原方案结论不能回退到其他活动。','无参与活动显示“当前学生在所选学期暂无参与的评价活动”，不输出空表格；学生或学期失效显示对应异常，不查询替代范围。','活动按稳定ID识别，同名不同ID分别保留；名称转义，缺少日期的端点显示—，不推算活动时间。','0分有效且预警，59.96%预警，60%不预警；全部达标仅巩固拓展，保留原高分；无数据不作0分。','历史方案查询对应历史学期全部参与活动，保留历史状态；配置时间与四周复核分别展示。']),
+      p(model)+p(scoring)+p(participants)+p(migration)+p(previous)+p('GrowthSupport.getPlan({studentId,term,scope})复用相同分析。低分以个人二级rawScore<60判断；参考目标【假设】min(60,round(rawScore+10,2))，增加不超过10个百分点且不高于60%。无低分时基线保持当前rawScore。复核【假设】4周第4周；评价基准及计算范围继续使用现有规则。第五节复用GrowthPersonalTracking.getActivities(studentId,term)，只取方案保存学生与学期，不传入或覆盖scope。参与查询以活动目录顺序返回，显式participantIds优先，无名单按本人该学期已有记录认定；每行以activity.id识别，直接读取activity.name/startDate/endDate，日期缺失端显示—。不用plan.startDate/endDate、评价记录最早最晚日期或未来28天替代活动配置日期。清单不生成跨活动评价结论，目标、建议和责任仅为草案，不表示已确认或实施。')+p('研发文档《学生成长档案固定模板对照表.md》是独立模板目录，已实现状态以条件和正文在当前源码中实际匹配为准，待研发行尚未接入。现有建议、评分、预警、勋章和排名不因整理文档而改变。')+telemetry('support_plan_view、support_plan_back、support_plan_export/print','source_page、student_token、term_id、activity_id、dimension_key、role、data_status、target_count、format、result'),
       p(local)+p('建议不推断心理疾病或固定能力；目标需教师结合实际确认。当前没有确认、指派、完成和提醒能力，因此不设置相应成功事件。'),
-      ol(['所有入口复制活动、一级及主体，内部二级条件固定all；学校无个体方案入口。','阈值与目标公式、并列优势、无低分高分保留、无数据及部分评价正确；模板文档不改变运行结果。','第五节仅“评价活动”“活动时间”两字段，名称及起止日期与目录一致；旧“评价依据与方案口径”、本节两级指标和实际评价周期不再展示。','未参加或失效只显示相应活动信息状态；参加但无评价仍显示配置，历史与旧活动ID解析正确。','页面、HTML、打印目标行动角色跟踪一致，PRD不入输出；模板文档35项二级、15项一级、完整示例及实现状态齐全。',modal])
+      ol(['所有入口复制活动、一级及主体，内部二级条件固定all；学校无个体方案入口。','阈值与目标公式、并列优势、无低分高分保留、无数据及部分评价正确；模板文档不改变运行结果。','第五节固定评价活动、活动时间两列，按方案学生和所选学期完整列出全部参与活动，目录顺序与活动ID准确；名称及配置日期与目录一致，缺失日期为—。','显式含本人但无记录、空名单、排除本人、无名单有记录、同名不同ID、无参与活动、原scope未参加或失效、学生或学期失效均符合规则；历史方案不混用系统当前学期。','原scope失效或未参加时保留原方案状态并独立显示其余合法参与活动，不修改目标、建议、曲线或复核的原范围；320—1440px长名称和日期完整可读。','页面、HTML、打印共用同一清单和方案结果；PRD不入输出；旧评价依据与方案口径、本节两级指标及实际评价周期保持删除；模板文档35项二级、15项一级、完整示例及实现状态齐全。',modal])
     ])
   });
   // The secondary-result table contract applies to every embedded activity analysis.
@@ -3717,7 +3727,7 @@
   const secondaryBoundary='本合同覆盖个人多维分析、群体主分析、独立综合评价表现、学校专项、学校完整目录、统计报告及学生/教师/家长三角色报告第五部分嵌入分析。个人报告雷达旁固定五育快照表为明确例外，保留一级数值行及原快照口径。图表、趋势、摘要、评语、教师业务、学生名单、人口分布和学校活动汇总表保持原结构及算法；已有二级粒度的支持建议、证据和培养方案业务表保留业务行结构。概览“查看全部一级指标”导航及一级筛选保留。';
   secondaryTablePages.forEach(id=>{
     const doc=global.GrowthPagePRD.pages[id];
-    doc.sections[0].html+=p('V2.4将活动指标结果表统一为一级分组与二级数值行，直接呈现完整二级事实，不调整既有评分、图表及总体摘要。');
+    doc.sections[0].html+=p('活动指标结果表统一为一级分组与二级数值行，直接呈现完整二级事实，不调整既有评分、图表及总体摘要。');
     doc.sections[2].html+=p(secondaryBoundary);
     const row=['指标结果表','一级分组与二级数值行',secondaryTable,'P0','默认配置13/11/6/5行；父级不完整不屏蔽有效二级。'];
     doc.sections[3].html=doc.sections[3].html.replace('</tbody>','<tr>'+row.map(s=>'<td>'+s+'</td>').join('')+'</tr></tbody>');
@@ -4648,6 +4658,7 @@ window.TeacherReportConfig = {autoOpen: false};
             scoringRecords: perPerson.reduce((sum, i) => sum + i.scoringRecordCount, 0) };
         }) };
     });
+    const scoringPeople = people.filter(person => finite(person.averageScoreRate));
     return {
       activityId: opts.activityId,
       members: ids.length, expected: expectedIds.size, evaluated: evaluatedIds.size, complete,
@@ -4655,6 +4666,8 @@ window.TeacherReportConfig = {autoOpen: false};
       expectedRaters, participatingRaters, participation: ratio(participatingRaters, expectedRaters),
       expectedTasks: scopedTasks.length, completedTasks: completed.length, completion: ratio(completed.length, scopedTasks.length),
       averageScoreRate: people.length === 1 ? people[0].averageScoreRate : null,
+      teamAverageScoreRate: mean(scoringPeople.map(person => person.averageScoreRate)),
+      scoringTeacherCount: scoringPeople.length,
       validItemCount: people.length === 1 ? people[0].validItemCount : 0,
       configuredItemCount: selectedAreas.reduce((sum, area) => sum + area.items.length, 0),
       recordCount: scopedRecords.length, areas: resultAreas, people, records: scopedRecords
@@ -4830,7 +4843,7 @@ window.TeacherReportPRD = {
       "sections": [
         {
           "title": "1. 背景与目标",
-          "html": "<p>按部门含下级的授权教师展示统计、二级结果与两类团队建议；简化为固定字段表格，不再提供成员及部门明细模块。</p><p>统一字段为“评价活动 → 一级指标 → 二级指标”。activityId、areaId、itemId为兼容标识；不新增评价类型目录，不将一级指标或内部评分模板称为评价类型。</p><p>V0.8替代V0.7两页评价表现条形图、任务完成列、个人报告身份行与佐证入口、团队评分任务完成度卡及规则摘要的展示；计分、完整性和四类模板匹配规则沿用。报告内选择器统一称为“一级指标”，与顶部查询筛选独立。</p><p>2026-11-15交互调整：个人、团队及记录弹窗全部移除计算问号、提示浮层、空包装与占位。计算口径保留为隐藏元数据，供HTML导出与打印的静态计算说明使用；计分及样本算法不变。</p>"
+          "html": "<p>按部门含下级的授权教师展示统计、二级结果与两类团队建议；简化为固定字段表格，不再提供成员及部门明细模块。</p><p>统一字段为“评价活动 → 一级指标 → 二级指标”。activityId、areaId、itemId为兼容标识；不新增评价类型目录，不将一级指标或内部评分模板称为评价类型。</p><p>V0.8替代V0.7两页评价表现条形图、任务完成列、个人报告身份行与佐证入口、团队评分任务完成度卡及规则摘要的展示；计分、完整性和四类模板匹配规则沿用。报告内选择器统一称为“一级指标”，与顶部查询筛选独立。</p><p>2026-11-15交互调整：个人、团队及记录弹窗全部移除计算问号、提示浮层、空包装与占位。计算口径保留为隐藏元数据，供HTML导出与打印的静态计算说明使用；计分及样本算法不变。</p><p>团队统计卡修订：2026-11-15。顶部固定为应被评价教师、被评价教师覆盖率、有效评价记录数、平均得分率；移除顶部完整评价覆盖率、评分人参与率。新增teamAverageScoreRate与scoringTeacherCount，逐项成绩、任务完整性、其他表格、个人报告及四类模板规则保持。</p>"
         },
         {
           "title": "2. 用户与使用场景",
@@ -4842,27 +4855,27 @@ window.TeacherReportPRD = {
         },
         {
           "title": "4. 功能需求列表",
-          "html": "<div class=\"tg-table-wrap\"><table><thead><tr><th>功能模块</th><th>功能点</th><th>需求描述</th><th>优先级（P0 / P1 / P2）</th><th>备注说明</th></tr></thead><tbody><tr><td>部门</td><td>含下级授权范围</td><td>默认全部部门，直属及全部下级教师并集与活动名单、用户授权取交集，按教师ID去重。</td><td>P0</td><td>departmentId不覆盖teamId</td></tr><tr><td>统计</td><td>四卡与计算口径</td><td>仅保留应被评价教师、被评价教师覆盖率、完整评价覆盖率、评分人参与率四卡；页面不显示计算问号，口径通过隐藏元数据进入输出静态计算说明；删除评分任务完成度卡。</td><td>P0</td><td>记录不代替任务或人数</td></tr><tr><td>页面</td><td>删除两个模块</td><td>删除成员评价情况、部门对照及对应入口，剩余章节连续编号；保留顶部部门筛选和统计。</td><td>P0</td><td>本版替代旧成员/部门展示规则</td></tr><tr><td>主体</td><td>汇总与纵向明细</td><td>固定教师、家长/学生两行汇总；下方按主体展示固定列一级指标、二级指标、团队均值得分率、有效教师；指标名称仅作为行值。</td><td>P0</td><td>不受顶部另一主体限制</td></tr><tr><td>依据</td><td>主体独立查询</td><td>记录入口仅替换主体，其余部门、活动、周期、指标与授权条件保留；分页、佐证和返回保留作用域。</td><td>P0</td><td>汇总和记录不受报告内一级指标收窄</td></tr><tr><td>层级</td><td>字段与稳定标识</td><td>页面、计算口径、记录、导出打印及PRD使用评价活动、一级指标、二级指标；不新增评价类型层；保留activityId/areaId/itemId兼容键。</td><td>P0</td><td>名称不代替唯一标识</td></tr><tr><td>计分</td><td>二级得分率</td><td>记录按score/maxScore×100归一；个人同二级记录等权；团队和个人比较平均值先个人后教师等权；一级仅分类。</td><td>P0</td><td>任务完整性独立</td></tr><tr><td>诊断</td><td>四类确定性模板</td><td>当前报告内一级指标下按最高、最低及全部并列项匹配；覆盖空、单项、均衡、部分缺失和团队样本不足；词库使用稳定三级标识。</td><td>P0</td><td>完整映射见本PRD第5章</td></tr><tr><td>表现</td><td>报告内一级指标</td><td>默认当前报告范围首个含二级指标的一级；联动二级数值表、分析建议、周期及主体分项，不改变统计卡、全量明细或整组记录。</td><td>P0</td><td>一级不计分</td></tr><tr><td>输出</td><td>全量HTML与打印</td><td>保留静态报告内一级指标及当前范围全部二级明细；个人追加局部筛选后的全部记录，不只输出当前20条；移除操作、隐藏计算元数据、筛选及PRD，保留静态计算说明。</td><td>P0</td><td>输出使用已应用快照</td></tr><tr><td>开发规则</td><td>PRD弹窗</td><td>个人与团队各保留九章和固定五列功能表；显示当前已应用范围；支持关闭、遮罩、Escape、Tab焦点循环及入口焦点恢复。</td><td>P1</td><td>不应用草稿、不进入输出</td></tr><tr><td>表现</td><td>全宽数值表</td><td>两页评价表现删除条形图和任务完成列，改全宽单列表格布局。团队固定列为二级指标、团队均值得分率、有效教师。</td><td>P0</td><td>周期对照图保留</td></tr><tr><td>计算口径</td><td>无可见提示与静态说明</td><td>移除统计卡、表头、标题、列表、图表及记录弹窗中的计算问号和包装占位；同位置仅保留隐藏口径元数据。导出打印收集已应用范围后删除元数据，末尾保留去重计算说明。</td><td>P0</td><td>不改变评分或其他操作入口</td></tr></tbody></table></div>"
+          "html": "<div class=\"tg-table-wrap\"><table><thead><tr><th>功能模块</th><th>功能点</th><th>需求描述</th><th>优先级（P0 / P1 / P2）</th><th>备注说明</th></tr></thead><tbody><tr><td>部门</td><td>含下级授权范围</td><td>默认全部部门，直属及全部下级教师并集与活动名单、用户授权取交集，按教师ID去重。</td><td>P0</td><td>departmentId不覆盖teamId</td></tr><tr><td>统计</td><td>四卡与计算口径</td><td>固定展示应被评价教师、被评价教师覆盖率、有效评价记录数、平均得分率；删除顶部完整评价覆盖率、评分人参与率，不恢复评分任务完成度。记录含无法计分业务有效记录；teamAverageScoreRate先教师内有结果二级等权，再有效教师等权；scoringTeacherCount辅助显示参与计算教师N人。页面无问号，隐藏口径进入静态说明。</td><td>P0</td><td>记录不代替任务或人数</td></tr><tr><td>页面</td><td>删除两个模块</td><td>删除成员评价情况、部门对照及对应入口，剩余章节连续编号；保留顶部部门筛选和统计。</td><td>P0</td><td>本版替代旧成员/部门展示规则</td></tr><tr><td>主体</td><td>汇总与纵向明细</td><td>固定教师、家长/学生两行汇总；下方按主体展示固定列一级指标、二级指标、团队均值得分率、有效教师；指标名称仅作为行值。</td><td>P0</td><td>不受顶部另一主体限制</td></tr><tr><td>依据</td><td>主体独立查询</td><td>记录入口仅替换主体，其余部门、活动、周期、指标与授权条件保留；分页、佐证和返回保留作用域。</td><td>P0</td><td>汇总和记录不受报告内一级指标收窄</td></tr><tr><td>层级</td><td>字段与稳定标识</td><td>页面、计算口径、记录、导出打印及PRD使用评价活动、一级指标、二级指标；不新增评价类型层；保留activityId/areaId/itemId兼容键。</td><td>P0</td><td>名称不代替唯一标识</td></tr><tr><td>计分</td><td>二级得分率</td><td>记录按score/maxScore×100归一；个人同二级记录等权；团队和个人比较平均值先个人后教师等权；一级仅分类。</td><td>P0</td><td>任务完整性独立</td></tr><tr><td>诊断</td><td>四类确定性模板</td><td>当前报告内一级指标下按最高、最低及全部并列项匹配；覆盖空、单项、均衡、部分缺失和团队样本不足；词库使用稳定三级标识。</td><td>P0</td><td>完整映射见本PRD第5章</td></tr><tr><td>表现</td><td>报告内一级指标</td><td>默认当前报告范围首个含二级指标的一级；联动二级数值表、分析建议、周期及主体分项，不改变统计卡、全量明细或整组记录。</td><td>P0</td><td>一级不计分</td></tr><tr><td>输出</td><td>全量HTML与打印</td><td>保留静态报告内一级指标及当前范围全部二级明细；个人追加局部筛选后的全部记录，不只输出当前20条；移除操作、隐藏计算元数据、筛选及PRD，保留静态计算说明。</td><td>P0</td><td>输出使用已应用快照</td></tr><tr><td>开发规则</td><td>PRD弹窗</td><td>个人与团队各保留九章和固定五列功能表；显示当前已应用范围；支持关闭、遮罩、Escape、Tab焦点循环及入口焦点恢复。</td><td>P1</td><td>不应用草稿、不进入输出</td></tr><tr><td>表现</td><td>全宽数值表</td><td>两页评价表现删除条形图和任务完成列，改全宽单列表格布局。团队固定列为二级指标、团队均值得分率、有效教师。</td><td>P0</td><td>周期对照图保留</td></tr><tr><td>计算口径</td><td>无可见提示与静态说明</td><td>移除统计卡、表头、标题、列表、图表及记录弹窗中的计算问号和包装占位；同位置仅保留隐藏口径元数据。导出打印收集已应用范围后删除元数据，末尾保留去重计算说明。</td><td>P0</td><td>不改变评分或其他操作入口</td></tr></tbody></table></div>"
         },
         {
           "title": "5. 核心流程与交互说明",
-          "html": "<ol><li>部门树根为校长，子部门依次政教处、教导处、门卫、后勤部、工会、党务部、财务处、校务办。选择部门含全部下级，教师并集与活动名册、用户授权取交集，按教师ID去重。</li><li>顶部保留活动、周期、一级、二级与主体筛选；主体恰为全部、教师、家长/学生。切活动重置两级，切一级重置二级，二级必须属于当前活动与一级。</li><li>仅保留应被评价教师、被评价教师覆盖率、完整评价覆盖率、评分人参与率四卡，均匀排列并保留提示；删除评分任务完成度卡。删除成员评价情况和部门对照整个模块及入口，章节连续编号；部门筛选与含下级计算继续生效。</li><li>报告头删除规则版本、数据截至及成绩摘要，页尾不重复规则版本；活动、周期及当前范围保留。</li><li>团队评价表现仅展示全宽数值表，固定列为二级指标、团队均值得分率、有效教师；删除条形图及任务完成列，周期对照图保留。报告内选择器显示一级指标，辅助功能名称为报告展示一级指标。</li><li>所有剩余表格使用固定字段表头；一级、二级指标名称仅作为数据行。报告内一级指标联动二级数值表、分析建议、周期及主体纵向明细，不改变卡片、全量二级明细和主体汇总。</li><li>主体汇总固定教师、家长/学生两行，固定列为评价主体、完整评价教师、有效评价记录、评价依据。下方分别展示两个主体的一级指标、二级指标、团队均值得分率、有效教师纵向表。</li><li>固定两组忽略顶部主体条件，保留其余部门、活动、周期、指标、规则与授权；每个二级独立样本。完整教师与有效记录按整组范围，不按纵向行重复累计。无数据保留两组，成绩—，人数与记录0。</li><li>主体查看记录独立保存该组范围，不受顶部另一主体或报告内一级指标阻挡；记录弹窗沿用每页6条，佐证返回保持页码及作用域。</li><li>导出打印保留当前报告内一级指标静态文字、全部二级明细和固定两组结果，移除隐藏计算元数据、筛选、操作与PRD控件，保留报告末尾静态计算说明。</li></ol><!--TEACHER_TEMPLATE_TABLES--><h4>计算口径元数据与输出</h4><p>个人、团队的统计卡、标题、表头、列表、诊断结果、周期图系列、数值摘要及记录弹窗均不显示问号，不保留交互提示节点、焦点、ARIA弹窗关联或专属占位。每个实际计算字段继续输出hidden元数据，保存口径键与当前已应用范围。普通PRD、记录、佐证和筛选操作保持。</p><p>GrowthHints.tip返回空文本hidden span；teacherTip、metricHead、calculationMeta直接保留该元数据，不创建空的提示包装。HTML导出先展开个人全量记录，再收集实际data-help-key与data-help-scope，按键去重并列出所有实际范围，追加静态计算说明后移除元数据。打印同样先展开全量记录后收集，重复打印不追加重复附录；afterprint清理附录并恢复原分页。范围不读取未提交草稿。</p>"
+          "html": "<ol><li>部门树根为校长，子部门依次政教处、教导处、门卫、后勤部、工会、党务部、财务处、校务办。选择部门含全部下级，教师并集与活动名册、用户授权取交集，按教师ID去重。</li><li>顶部保留活动、周期、一级、二级与主体筛选；主体恰为全部、教师、家长/学生。切活动重置两级，切一级重置二级，二级必须属于当前活动与一级。</li><li>顶部按顺序仅展示应被评价教师、被评价教师覆盖率、有效评价记录数、平均得分率四卡，均匀排列，无问号、浮层入口或占位。删除顶部完整评价覆盖率、评分人参与率，不恢复评分任务完成度；内部统计及其他表格保留既有口径。平均得分率下显示“参与计算教师 N 人”，使用已应用报告范围，不受报告内展示一级指标切换影响。删除成员评价情况和部门对照整个模块及入口，章节连续编号；部门筛选与含下级计算继续生效。</li><li>报告头删除规则版本、数据截至及成绩摘要，页尾不重复规则版本；活动、周期及当前范围保留。</li><li>团队评价表现仅展示全宽数值表，固定列为二级指标、团队均值得分率、有效教师；删除条形图及任务完成列，周期对照图保留。报告内选择器显示一级指标，辅助功能名称为报告展示一级指标。</li><li>所有剩余表格使用固定字段表头；一级、二级指标名称仅作为数据行。报告内一级指标联动二级数值表、分析建议、周期及主体纵向明细，不改变卡片、全量二级明细和主体汇总。</li><li>主体汇总固定教师、家长/学生两行，固定列为评价主体、完整评价教师、有效评价记录、评价依据。下方分别展示两个主体的一级指标、二级指标、团队均值得分率、有效教师纵向表。</li><li>固定两组忽略顶部主体条件，保留其余部门、活动、周期、指标、规则与授权；每个二级独立样本。完整教师与有效记录按整组范围，不按纵向行重复累计。无数据保留两组，成绩—，人数与记录0。</li><li>主体查看记录独立保存该组范围，不受顶部另一主体或报告内一级指标阻挡；记录弹窗沿用每页6条，佐证返回保持页码及作用域。</li><li>导出打印保留当前报告内一级指标静态文字、全部二级明细和固定两组结果，移除隐藏计算元数据、筛选、操作与PRD控件，保留报告末尾静态计算说明。</li></ol><!--TEACHER_TEMPLATE_TABLES--><h4>计算口径元数据与输出</h4><p>个人、团队的统计卡、标题、表头、列表、诊断结果、周期图系列、数值摘要及记录弹窗均不显示问号，不保留交互提示节点、焦点、ARIA弹窗关联或专属占位。每个实际计算字段继续输出hidden元数据，保存口径键与当前已应用范围。普通PRD、记录、佐证和筛选操作保持。</p><p>GrowthHints.tip返回空文本hidden span；teacherTip、metricHead、calculationMeta直接保留该元数据，不创建空的提示包装。HTML导出先展开个人全量记录，再收集实际data-help-key与data-help-scope，按键去重并列出所有实际范围，追加静态计算说明后移除元数据。打印同样先展开全量记录后收集，重复打印不追加重复附录；afterprint清理附录并恢复原分页。范围不读取未提交草稿。</p>"
         },
         {
           "title": "6. 异常场景与边界条件",
-          "html": "<ul><li>有效0%参与均值与相对比较；缺失显示—；有记录但全部无法计分仍显示记录数，平均得分率为空。</li><li>部分任务完成可形成二级结果，任务缺口不认定为能力或师德问题；无应任务、应教师或应评分人数时比例—。</li><li>指标目录为空显示空态，不补齐固定四分类；团队单二级筛选不生成一级成绩。</li><li>显示保留一位小数，但最高、最低、并列均使用未取整结果；显示相同不等于并列。</li><li>周期结果独立计算，两期缺任一期有效结果或规则不可比时不计算百分点变化。</li><li>【假设】真实接口失败保留上一成功快照，过期响应不得覆盖最新查询；记录与佐证均须服务端授权校验。</li><li>PRD打开、关闭及记录佐证操作不应用顶部草稿，不改报告筛选。</li></ul><ul><li>任务已完成但评分/满分无效：覆盖、参与与任务完整性仍按recordId业务关联统计；该评分不进入二级均值及计分样本。禁止以任务完成替代评分有效性。</li><li>页面无可见计算问号、空包装、占位或计算浮层焦点；记录弹窗Escape继续直接关闭记录弹窗。320—1440px不产生提示占位或溢出。</li><li>零分、零分母、部分评价、无任务、无有效结果、历史不可比及未取整并列判断均按原算法解释；教师不引入学生60%规则。</li></ul>"
+          "html": "<ul><li>有效0%参与均值与相对比较；缺失显示—；有业务有效记录但全部无法计分时仍显示记录数，团队平均得分率显示“—”、参与计算教师0人；有效0%与部分评价已有结果参与团队平均。</li><li>部分任务完成可形成二级结果，任务缺口不认定为能力或师德问题；无应任务、应教师或应评分人数时比例—。</li><li>指标目录为空显示空态，不补齐固定四分类；团队单二级筛选不生成一级成绩。</li><li>显示保留一位小数，但最高、最低、并列均使用未取整结果；显示相同不等于并列。</li><li>周期结果独立计算，两期缺任一期有效结果或规则不可比时不计算百分点变化。</li><li>【假设】真实接口失败保留上一成功快照，过期响应不得覆盖最新查询；记录与佐证均须服务端授权校验。</li><li>PRD打开、关闭及记录佐证操作不应用顶部草稿，不改报告筛选。</li></ul><ul><li>任务已完成但评分/满分无效：覆盖、参与与任务完整性仍按recordId业务关联统计；该评分不进入二级均值及计分样本。禁止以任务完成替代评分有效性。</li><li>页面无可见计算问号、空包装、占位或计算浮层焦点；记录弹窗Escape继续直接关闭记录弹窗。320—1440px不产生提示占位或溢出。</li><li>零分、零分母、部分评价、无任务、无有效结果、历史不可比及未取整并列判断均按原算法解释；教师不引入学生60%规则。</li></ul>"
         },
         {
           "title": "7. 数据口径与埋点需求",
-          "html": "<p>统一字段为“评价活动 → 一级指标 → 二级指标”。activityId、areaId、itemId为兼容标识；不新增评价类型目录，不将一级指标或内部评分模板称为评价类型。</p><p>逐记录score、maxScore须为有限数，maxScore＞0且0≤score≤maxScore。合法记录得分率＝score÷maxScore×100%；个人同二级对记录得分率取均值，有一条有效评分即可形成结果；缺失不补零。缺少满分、非法满分及越界保留业务记录与提交状态，但不计入得分率或计分样本并返回原因。一级不返回score、scoreRate等成绩。</p><p>个人逐项“平均值”为同活动全部授权教师（包含本人）的有效个人二级结果等权均值；团队二级结果为所选部门含下级授权教师等权均值，各项样本独立。个人顶部“平均得分率”仅为该教师当前报告范围有结果的二级指标等权均值，不替代逐项全活动平均值。</p><p>有效记录数使用业务有效记录，不等于可计分记录、任务数或评分人数；底层任务完成、完整教师和参与人数继续独立统计；本轮不新增接口，删除页面任务完成展示不删除内部字段。周期差值为当前减上一周期，单位个百分点。</p><p>完整评价教师、有效评价记录取主体整组报告范围；纵向二级的有效教师分子分母各自计算。固定主体只替换原始主体集合。</p><p>【假设】埋点包括查询、模式切换、报告内一级指标、模板命中、记录局部筛选/分页、佐证查看、导出、打印调用及PRD开关。只记录稳定范围标识、模板ID、状态、结果和计数，不采集姓名、评语全文或附件内容。打印调用不代表实际打印完成。</p><p>任务完成＝任务recordId存在且关联当前范围业务记录；不要求score/maxScore可计算。被评价覆盖分子为完成任务去重教师，分母为任务去重教师；评分人参与分子为完成任务去重raterId，分母为任务去重raterId。完整评价按所选必评任务全部完成判断，无任务项不判完整。业务记录数含无法计分记录；评分有效记录要求有限score/maxScore、maxScore＞0且0≤score≤maxScore。</p><p>个人二级先有效记录归一后平均，团队二级先个人再有效教师等权；顶部个人平均得分率再按有结果的二级等权；逐项全活动平均值包含本人，不受部门收窄。周期差为未取整结果相减，展示一位小数/个百分点。诊断个人仅当前展示一级内可计算项，团队另要求每项n≥2，最高最低及并列使用未取整值。</p><p>GrowthHints保留旧键及结构化口径label/formula/logic/scope/validity/precision；validity继续说明样本与缺失。tip(key,{scope})仅返回无文本、无焦点、无ARIA交互的hidden span，保存data-help-key/scope。appendNotes/preparePrint从实际报告隐藏元数据收集、按键去重并列出全部已应用范围；不收集PRD、草稿或报告外字段。页面不提供计算浮层，不再采集计算提示开关埋点；查询、导出、打印和PRD等既有埋点保留。</p>"
+          "html": "<p>统一字段为“评价活动 → 一级指标 → 二级指标”。activityId、areaId、itemId为兼容标识；不新增评价类型目录，不将一级指标或内部评分模板称为评价类型。</p><p>逐记录score、maxScore须为有限数，maxScore＞0且0≤score≤maxScore。合法记录得分率＝score÷maxScore×100%；个人同二级对记录得分率取均值，有一条有效评分即可形成结果；缺失不补零。缺少满分、非法满分及越界保留业务记录与提交状态，但不计入得分率或计分样本并返回原因。一级不返回score、scoreRate等成绩。</p><p>个人逐项“平均值”为同活动全部授权教师（包含本人）的有效个人二级结果等权均值；团队二级结果为所选部门含下级授权教师等权均值，各项样本独立。个人顶部“平均得分率”仅为该教师当前报告范围有结果的二级指标等权均值，不替代逐项全活动平均值。</p><p>有效记录数使用业务有效记录，不等于可计分记录、任务数或评分人数；底层任务完成、完整教师和参与人数继续独立统计；本轮不新增接口，删除页面任务完成展示不删除内部字段。周期差值为当前减上一周期，单位个百分点。</p><p>完整评价教师、有效评价记录取主体整组报告范围；纵向二级的有效教师分子分母各自计算。固定主体只替换原始主体集合。</p><p>【假设】埋点包括查询、模式切换、报告内一级指标、模板命中、记录局部筛选/分页、佐证查看、导出、打印调用及PRD开关。只记录稳定范围标识、模板ID、状态、结果和计数，不采集姓名、评语全文或附件内容。打印调用不代表实际打印完成。</p><p>任务完成＝任务recordId存在且关联当前范围业务记录；不要求score/maxScore可计算。被评价覆盖分子为完成任务去重教师，分母为任务去重教师；评分人参与分子为完成任务去重raterId，分母为任务去重raterId。完整评价按所选必评任务全部完成判断，无任务项不判完整。业务记录数含无法计分记录；评分有效记录要求有限score/maxScore、maxScore＞0且0≤score≤maxScore。</p><p>个人二级先有效记录归一后平均，团队二级先个人再有效教师等权；顶部个人平均得分率再按有结果的二级等权；逐项全活动平均值包含本人，不受部门收窄。周期差为未取整结果相减，展示一位小数/个百分点。诊断个人仅当前展示一级内可计算项，团队另要求每项n≥2，最高最低及并列使用未取整值。</p><p>GrowthHints保留旧键及结构化口径label/formula/logic/scope/validity/precision；validity继续说明样本与缺失。tip(key,{scope})仅返回无文本、无焦点、无ARIA交互的hidden span，保存data-help-key/scope。appendNotes/preparePrint从实际报告隐藏元数据收集、按键去重并列出全部已应用范围；不收集PRD、草稿或报告外字段。页面不提供计算浮层，不再采集计算提示开关埋点；查询、导出、打印和PRD等既有埋点保留。</p><p>团队顶部有效评价记录数按当前已应用部门（含下级去重）、活动、周期、指标及主体范围查询业务有效记录，包含无法计分记录，不等于计分记录、任务、教师或评分人数。teamAverageScoreRate先对每位教师有结果的二级scoreRate取算术均值，再对这些个人均值按教师等权平均；scoringTeacherCount为至少有一个可计算二级结果的去重教师数，显示“参与计算教师 N 人”。不按记录数、任务数或各二级样本数加权，也不直接平均各团队二级均值；报告内展示一级指标切换不改变该顶部摘要。</p><p>团队平均计算保留未取整精度，展示一位小数；有效0%及部分评价已有结果均纳入，缺失不补零。没有可计算教师时teamAverageScoreRate为空、显示“—”，scoringTeacherCount为0，业务记录数仍可大于0；无应评价教师时覆盖率“—”，空记录集合显示0。顶部移除完整评价覆盖率与评分人参与率不删除内部字段，不改变完整评价教师、主体表格、逐项团队均值或个人全活动平均值。</p>"
         },
         {
           "title": "8. 风险、依赖与限制",
-          "html": "<p>【假设】现有合成示例仍为1个活动、12名教师、4个一级指标、20个二级指标、4类原始主体及2个周期，各二级示例满分5分；真实计算读取记录满分快照。真实组织、授权、任务名单、有效记录版本及可比性依赖上游接口；本原型不执行生产写入。浏览器、真实下载、实际打印预览及生产接口单独记录，不把未执行项标记通过。</p><p>【假设】静态计算说明仅适用于HTML报告与打印件，CSV结构保持。共用提示组件由学生与教师共用，教师键保持独立；交付须同步重建集成会话预览与教师独立HTML。本轮无评分、任务、样本或诊断数据变更。</p>"
+          "html": "<p>【假设】现有合成示例仍为1个活动、12名教师、4个一级指标、20个二级指标、4类原始主体及2个周期，各二级示例满分5分；真实计算读取记录满分快照。真实组织、授权、任务名单、有效记录版本及可比性依赖上游接口；本原型不执行生产写入。浏览器、真实下载、实际打印预览及生产接口单独记录，不把未执行项标记通过。</p><p>【假设】静态计算说明仅适用于HTML报告与打印件，CSV结构保持。共用提示组件由学生与教师共用，教师键保持独立；交付须同步重建集成会话预览与教师独立HTML。本轮新增顶部团队平均及参与计算教师数字段，不修改原始记录、逐项评分、任务完整性、其他表格样本或诊断规则。</p>"
         },
         {
           "title": "9. 验收标准",
-          "html": "<ul><li>统计区为四卡，无评分任务完成度卡；报告头、页尾及输出不显示规则版本、数据截至或成绩摘要。</li><li>团队评价表现仅全宽三列数值表，无条形图或任务完成列；周期对照图保留，报告内一级指标切换不修改查询与整组范围。</li><li>团队不显示成员评价情况、部门对照及其入口；剩余章节连续编号，任何表头都不使用动态指标名称。</li><li>全部部门及校长范围12名教师、852/960项任务；兼任整体去重，空部门比例—。</li><li>固定教师/家长学生两组汇总记录436/416，顶部单主体及报告内一级指标切换不改变两组范围；纵向二级各自样本，整组人数记录不累加。</li><li>至少2个有效教师的二级才进入团队相对诊断；仅1人事实表仍保留，SAMPLE/SINGLE/BALANCED/并列/PARTIAL模板均正确。</li><li>教师甲80%且8记录、乙60%且1记录，团队二级70%；一级无成绩，部分评分有结果但完整性保持缺口。</li><li>顶部家庭条件仍可查看教师组436条及佐证；分页、关闭与报告状态独立。</li><li>页面、说明、输出及PRD统一三级命名；主PRD及两页内PRD各九章，功能需求表固定五列。</li><li>桌面与760px不出现页面横向溢出，宽表在容器内滚动；实际下载和打印预览按执行情况记录。</li><li>重建两个HTML，8769与独立页为V0.8，GitHub Pages默认学生；学生既有功能与计分不变。</li></ul><ul><li>逐项核对教师范围、平均得分率、二级结果、有效样本、任务完整性、覆盖、评分参与、记录计数、周期及诊断结果：页面无计算问号与空包装，隐藏元数据及输出静态说明与实际口径一致；不套用学生达标或排名。</li><li>覆盖及参与说明明确任务recordId关联业务记录，非法评分不计分但不撤销任务提交。原始记录及全部既有计算快照前后一致。</li><li>悬停、点击及键盘均无计算提示浮层，无残留可聚焦问号、ARIA关联或占位；320—1440px布局正常，PRD、记录和佐证操作保持。</li><li>个人/团队导出与打印仅有一份去重计算说明，包含实际使用范围、全量记录说明，无问号、隐藏元数据或草稿范围；重复打印恢复分页无副作用。</li></ul>"
+          "html": "<ul><li>顶部四卡恰为应被评价教师、被评价教师覆盖率、有效评价记录数、平均得分率，无顶部完整评价覆盖率、评分人参与率或评分任务完成度；报告头、页尾及输出不显示规则版本、数据截至或成绩摘要。</li><li>团队评价表现仅全宽三列数值表，无条形图或任务完成列；周期对照图保留，报告内一级指标切换不修改查询与整组范围。</li><li>团队不显示成员评价情况、部门对照及其入口；剩余章节连续编号，任何表头都不使用动态指标名称。</li><li>全部部门及校长范围12名教师、852/960项任务；兼任整体去重，空部门比例—。</li><li>固定教师/家长学生两组汇总记录436/416，顶部单主体及报告内一级指标切换不改变两组范围；纵向二级各自样本，整组人数记录不累加。</li><li>至少2个有效教师的二级才进入团队相对诊断；仅1人事实表仍保留，SAMPLE/SINGLE/BALANCED/并列/PARTIAL模板均正确。</li><li>教师甲80%且8记录、乙60%且1记录，团队二级70%；一级无成绩，部分评分有结果但完整性保持缺口。</li><li>顶部家庭条件仍可查看教师组436条及佐证；分页、关闭与报告状态独立。</li><li>页面、说明、输出及PRD统一三级命名；主PRD及两页内PRD各九章，功能需求表固定五列。</li><li>桌面与760px不出现页面横向溢出，宽表在容器内滚动；实际下载和打印预览按执行情况记录。</li><li>重建两个HTML，8769与独立页为V0.8，GitHub Pages默认学生；学生既有功能与计分不变。</li></ul><ul><li>逐项核对教师范围、平均得分率、二级结果、有效样本、任务完整性、覆盖、评分参与、记录计数、周期及诊断结果：页面无计算问号与空包装，隐藏元数据及输出静态说明与实际口径一致；不套用学生达标或排名。</li><li>覆盖及参与说明明确任务recordId关联业务记录，非法评分不计分但不撤销任务提交。原始记录及全部既有计算快照前后一致。</li><li>悬停、点击及键盘均无计算提示浮层，无残留可聚焦问号、ARIA关联或占位；320—1440px布局正常，PRD、记录和佐证操作保持。</li><li>个人/团队导出与打印仅有一份去重计算说明，包含实际使用范围、全量记录说明，无问号、隐藏元数据或草稿范围；重复打印恢复分页无副作用。</li></ul><ul><li>同两项二级指标，教师甲100%／0%先得50%，教师乙100%／缺失先得100%，顶部teamAverageScoreRate=(50%＋100%)÷2=75.0%，scoringTeacherCount=2；不能先把二级团队均值100%与0%再平均成50.0%。</li><li>验证有效0%、部分评价、无法计分但业务有效记录、空范围及无有效结果：记录计数保留，平均无结果“—”、参与计算教师0人；顶部筛选生效，报告内展示一级切换不改变四卡。页面无问号，输出静态计算说明包含新增字段真实口径。</li></ul>"
         }
       ]
     }
@@ -4992,6 +5005,8 @@ window.TeacherReportPRD = {
     teamTeacherRange:teacherHelp('教师范围','教师范围＝部门直属与全部下级教师并集∩活动授权名单∩已知教师名单，按教师ID去重计数。','先展开部门及下级，合并兼任教师，再与活动名单和授权范围取交集。','当前已应用团队及活动；此范围人数不等于有应评任务人数或有效得分样本。','无符合条件教师计0；未配置任务者仍可属于教师范围，不自动计入任务分母。',countPrecision),
     teamExpected:teacherHelp('应被评价教师','应被评价人数＝当前范围应评分任务中教师编号的去重数量。','先按部门含下级与活动授权确定教师范围，再按周期、指标、主体筛任务，最后去重教师。','当前已应用团队、活动、周期、指标、主体；不受报告内一级指标展示选择影响。','没有任务的授权教师不计入应评价人数；无任务计0。分母来自任务，不从记录反推。',countPrecision),
     teamCoverage:teacherHelp('被评价教师覆盖率','覆盖率＝至少完成一项任务的去重教师数÷应被评价教师数×100%。','分母为当前任务中的去重教师；分子为任务关联记录编号已关联当前范围业务记录的去重教师。','当前已应用团队、活动、周期、指标及主体范围；部分评价计入覆盖。','任务完成只核对记录关联，不要求评分可计算；无应评价教师时显示“—”，不补0%。',ratePrecision+' 分子分母人数为整数。'),
+    teamReportRecords:teacherHelp('有效评价记录数','记录数＝当前团队报告范围内业务有效评价记录的条数。','按部门直属及全部下级、活动授权、周期、一级/二级指标和顶部主体筛选，再按记录条数计数；兼任教师按教师ID去重后查询。','当前已应用团队报告查询范围；不受报告内一级指标展示选择或固定两主体分项影响。','包含满分异常等无法计分的业务有效记录；不等于可计分记录数、任务数、教师数或评分人数。无记录显示0。',countPrecision),
+    teamAverageRate:teacherHelp('平均得分率','个人平均得分率＝本人有结果的二级指标得分率等权平均；团队平均得分率＝有个人平均结果的教师等权平均。','先逐记录按实际得分÷满分×100%归一，再求每位教师各二级指标有效记录的平均，再求该教师有结果二级指标的等权平均，最后对有结果教师等权平均；不按记录数、有效指标数或各二级团队均值加权。','当前已应用部门直属及全部下级、活动授权、周期、一级/二级指标及顶部主体范围；不受报告内一级指标展示选择或固定两主体分项影响。',scoringValidity+' 部分评价可参与；无有效个人结果的教师不进入平均。参与计算教师为有个人平均得分率的去重教师数，不等于完整评价教师数。',ratePrecision+' 无有效教师时显示“—”，参与计算教师0人。'),
     teamCompleteCoverage:teacherHelp('完整评价覆盖率','完整评价覆盖率＝当前所选范围全部必评任务完成的教师数÷应被评价教师数×100%。','先逐二级指标核对全部必评任务的业务记录关联，再逐一级、逐教师判断完整，最后计算比例。','当前已应用团队、活动、周期、指标及主体；单项筛选仅表示选中范围完整。','任务完整与评分有效性独立；无必评任务的项不判完整；无应评价教师不计算比例。',ratePrecision+' 人数为整数。'),
     teacherPersonalItem:teacherHelp('个人二级指标得分率','个人二级得分率＝该教师该项所有有效记录的(实际得分÷满分×100%)算术平均。','先用每条记录自己的满分快照归一，再对本项有效记录等权平均。','当前教师、活动、周期、二级指标和主体；一级指标仅分类，不计算一级成绩。',scoringValidity+' 有一条有效评分即可计算，不以全部任务完成为前提。',ratePrecision),
     teacherAverage:teacherHelp('平均值与有效样本','平均值＝同活动全部授权教师的有效个人二级得分率等权平均；有效样本＝可计算本项的教师数 / 本项有应评任务的教师数。','先逐记录归一，再逐教师本项平均，再按有效教师等权平均；包含当前教师，不按记录条数给教师加权。','同活动全部授权教师、相同周期/二级指标/主体；不受部门或报告内一级指标展示选择收窄。',scoringValidity+' 每项使用自己的有效教师样本；部分评价可计入；任务分母与评分分子分别统计。',ratePrecision+' 样本人数为整数。'),
@@ -5099,7 +5114,7 @@ window.TeacherReportPRD = {
   }
   function statsHTML(data) {
     if(applied.mode==='personal')return `<div class="tg-stats two">${stat('有效评价记录数',data.recordCount+'<small> 条</small>','当前报告范围有效记录','teacherRecords')}${stat('平均得分率',pct(data.averageScoreRate),`有效二级指标 ${data.validItemCount} / ${data.configuredItemCount} 项${calculationMeta('teacherValidItems')}`,'teacherAverageRate')}</div>`;
-    return `<div class="tg-stats four">${stat('应被评价教师',data.expected+'<small> 人</small>',`部门范围 ${data.members} 名授权教师${calculationMeta('teamTeacherRange')}`,'teamExpected')}${stat('被评价教师覆盖率',pct(data.coverage),`${data.evaluated} / ${data.expected} 人已有评价记录`,'teamCoverage')}${stat('完整评价覆盖率',pct(data.completeCoverage),`${data.complete} / ${data.expected} 人评价完整`,'teamCompleteCoverage')}${stat('评分人参与率',pct(data.participation),`${data.participatingRaters} / ${data.expectedRaters} 人`,'teacherParticipation')}</div>`;
+    return `<div class="tg-stats four">${stat('应被评价教师',data.expected+'<small> 人</small>',`部门范围 ${data.members} 名授权教师${calculationMeta('teamTeacherRange')}`,'teamExpected')}${stat('被评价教师覆盖率',pct(data.coverage),`${data.evaluated} / ${data.expected} 人已有评价记录`,'teamCoverage')}${stat('有效评价记录数',data.recordCount+'<small> 条</small>','当前报告范围有效记录','teamReportRecords')}${stat('平均得分率',pct(data.teamAverageScoreRate),`参与计算教师 ${data.scoringTeacherCount} 人`,'teamAverageRate')}</div>`;
   }
   function overviewHTML(data,benchmark) {
     const personal=applied.mode==='personal',items=displayItems(data);
